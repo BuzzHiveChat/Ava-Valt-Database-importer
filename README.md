@@ -1,26 +1,28 @@
-# Ava-Valt Web Admin
+# Ava-Valt Web Admin V2
 
-This replaces the Unity **database/importer management** workflow. It does NOT replace the runtime remote loader inside the VRChat world.
+## What changed
+- Next.js patched to `^16.0.10`.
+- Removed deprecated no-op middleware.
+- Added current avtrDB V3 provider.
+- Standardized VRCX-style provider requests to `?search=...&n=...`.
+- Provider health now reports working / blocked / rate-limited / unavailable.
+- Explicit blocks are skipped; this project does not evade bans, access controls, or rate limits.
+- Added manual **RUN AUTO IMPORT NOW**.
+- Added Vercel Cron auto-import route.
+- Auto-import deduplicates first and makes one GitHub database commit per run.
 
-## Deploy
-1. Create a new GitHub repo for this website and upload these files.
-2. Import that repo into Vercel.
-3. Add environment variables from `.env.example`.
-4. `GITHUB_TOKEN`: fine-grained token limited to `BuzzHiveChat/Ava-Valt-Database`, Contents read/write.
-5. Set a strong `ADMIN_PASSWORD` and a long random `SESSION_SECRET`.
-6. Deploy, visit `/login`, and use the dashboard.
+## Vercel environment variables
+Set `GITHUB_TOKEN`, `ADMIN_PASSWORD`, `SESSION_SECRET`, and `CRON_SECRET` as **Secret** values.
+The GitHub token should be fine-grained and limited to the Ava-Valt-Database repository with Contents read/write.
 
-The browser never receives the GitHub token. GitHub writes happen only in server routes.
+Optional:
+- `AUTO_IMPORT_MAX_ADD=300`
+- `AUTO_IMPORT_TERMS=avatar,fox,cat,dog,furry,cute,robot,dragon`
 
-## Existing database
-Defaults already target:
-- owner: BuzzHiveChat
-- repo: Ava-Valt-Database
-- branch: main
-- path: avatar-index.json
+## Automatic schedule
+`vercel.json` defaults to `15 3 * * *` (03:15 UTC daily), which is compatible with Vercel Hobby's daily cron restriction.
+If your Vercel plan supports more frequent Cron Jobs, you can change the schedule.
 
-## Unity cleanup
-After the website successfully adds an avatar to GitHub and the published world can still load the remote database, import `AvaValtUnityImporterCleanup.cs` from the companion folder into Unity and run:
-`Ava-Valt > Migration > Remove Unity Database Tools`
-
-The cleanup intentionally preserves your runtime `AvaValt_System` / remote-loading scripts.
+## Safety
+Do not put secrets in source code. Do not commit `.env.local`.
+Providers that explicitly block this service should remain disabled/skipped rather than bypassed.
