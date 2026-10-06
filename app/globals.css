@@ -1,0 +1,2 @@
+
+textarea{width:100%;box-sizing:border-box}.danger{border-color:#ff6b81}.status{display:inline-block;padding:8px 12px;border-radius:999px;margin:8px 0 14px;background:#35252b}.status.good{background:#203b31}.error{color:#ff9ca9}.row{display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap}.top{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap}.eyebrow{font-size:12px;letter-spacing:.16em;opacity:.7}
