@@ -7,7 +7,24 @@ export default function AutoImport(){
  useEffect(()=>{load();loadHealth();const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
  async function save(patch){setMsg("Saving...");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const j=await r.json();if(r.ok){setS(j);setMsg("Saved.")}else setMsg(j.error||"Could not save")}
  async function run(){setMsg("Running importer...");const r=await fetch("/api/import/auto",{method:"POST"});const j=await r.json();setMsg(r.ok?`Finished: ${j.added} added • ${j.newFound} new found • ${j.total} total`:j.error);load()}
- async function repairPlatforms(){setMsg("Scanning existing avatars with unknown platform data...");const r=await fetch("/api/db/repair-platforms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({limit:50})});const j=await r.json();setMsg(r.ok?`Platform repair: checked ${j.checked}, fixed ${j.fixed}. ${j.remaining===0?"Repair complete!":"Run again to continue."}`:j.error);if(r.ok)loadHealth()}
+ async function repairAllPlatforms(){
+  if(!confirm("Repair all remaining Unknown platform records? This may take a while and will use the enabled avatar providers."))return;
+  setMsg("Repairing ALL remaining Unknown platforms — keep this page open...");
+  let totalFixed=0,totalChecked=0,lastRemaining=null,noProgress=0;
+  for(let pass=1;pass<=40;pass++){
+   const r=await fetch("/api/db/repair-all-platforms",{method:"POST"});
+   const j=await r.json();
+   if(!r.ok){setMsg(`Repair stopped: ${j.error||"request failed"} • fixed ${totalFixed} so far`);break}
+   totalFixed+=j.fixed||0;totalChecked+=j.checked||0;lastRemaining=j.remaining;
+   setMsg(`Repairing database... ${totalFixed} fixed this session • ${j.remaining} still Unknown • pass ${pass}`);
+   await loadHealth();
+   if(j.complete||j.remaining===0){setMsg(`PLATFORM REPAIR COMPLETE — ${totalFixed} fixed this session • 0 Unknown remaining.`);break}
+   if((j.fixed||0)===0)noProgress++;else noProgress=0;
+   if(noProgress>=1){setMsg(`Repair reached ${j.remaining} unresolved avatars. The enabled providers did not return platform data for these records, so they were left Unknown rather than guessed.`);break}
+  }
+  await loadHealth();
+}
+async function repairPlatforms(){setMsg("Scanning existing avatars with unknown platform data...");const r=await fetch("/api/db/repair-platforms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({limit:50})});const j=await r.json();setMsg(r.ok?`Platform repair: checked ${j.checked}, fixed ${j.fixed}. ${j.remaining===0?"Repair complete!":"Run again to continue."}`:j.error);if(r.ok)loadHealth()}
  if(!s)return <main className="wrap"><h1>Auto Import</h1><p>Loading controls...</p></main>;
  return <main className="wrap">
   <div className="top"><div><div className="eyebrow">AVA-VALT CONTROL CENTRE</div><h1>Auto Import</h1><p className="muted">Control scheduled database discovery without opening Unity.</p></div><a className="button secondary" href="/">Back to importer</a></div>
@@ -31,7 +48,8 @@ export default function AutoImport(){
  <p>PC: {health.pc} • Android: {health.android} • iOS: {health.ios}</p>
  {health.done&&<p><b>✓ All database records contain platform data.</b></p>}</>:<p className="muted">Counting database records...</p>}
  </section>
- <section className="card"><h2>Repair existing platform data</h2><p className="muted">Checks existing avatars that have no PC / Android / iOS data against enabled providers by avatar ID. It only fills platform data when a provider actually reports it; it does not guess.</p><button onClick={repairPlatforms}>SCAN & FIX NEXT 50</button></section>
+ <section className="card"><h2>Repair existing platform data</h2><p className="muted">Checks existing avatars that have no PC / Android / iOS data against enabled providers by avatar ID. It only fills platform data when a provider actually reports it; it does not guess.</p><button onClick={repairAllPlatforms}>FIX ALL REMAINING UNKNOWN</button>
+ <button className="secondary" onClick={repairPlatforms}>SCAN & FIX NEXT 50</button></section>
  <section className="card"><h2>Provider health from last run</h2>{!s.lastHealth?.length?<p className="muted">No run data yet.</p>:s.lastHealth.slice(-30).map((h,i)=><p key={i}><b>{h.provider}</b> — {h.state}{h.count?` • ${h.count} results`:""}{h.error?` • ${h.error}`:""} <span className="muted">({h.term})</span></p>)}</section>
   <p>{msg}</p>
  </main>
