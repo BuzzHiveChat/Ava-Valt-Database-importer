@@ -1,0 +1,1 @@
+import{authorized}from"../../../../lib/guard";import{searchProviders}from"../../../../lib/providers";export async function POST(req){if(!await authorized())return Response.json({error:"Unauthorized"},{status:401});try{return Response.json(await searchProviders(await req.json()))}catch(e){return Response.json({error:e.message},{status:500})}}
