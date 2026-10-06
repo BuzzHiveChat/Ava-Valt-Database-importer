@@ -1,10 +1,11 @@
 "use client";
 import {useEffect,useState} from "react";
 export default function AutoImport(){
- const [s,setS]=useState(null),[msg,setMsg]=useState(""),[health,setHealth]=useState(null);
+ const [s,setS]=useState(null),[msg,setMsg]=useState(""),[health,setHealth]=useState(null),[vrc,setVrc]=useState(null);
  async function loadHealth(){try{const r=await fetch(`/api/db/platform-health?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setHealth(await r.json())}catch{}}
  async function load(){const r=await fetch("/api/settings"); if(r.ok)setS(await r.json())}
- useEffect(()=>{load();loadHealth();const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
+ async function loadVrc(){try{const r=await fetch(`/api/vrchat/status?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setVrc(await r.json())}catch{}}
+ useEffect(()=>{load();loadHealth();loadVrc();const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
  async function save(patch){setMsg("Saving...");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const j=await r.json();if(r.ok){setS(j);setMsg("Saved.")}else setMsg(j.error||"Could not save")}
  async function run(){setMsg("Running importer...");const r=await fetch("/api/import/auto",{method:"POST"});const j=await r.json();setMsg(r.ok?`Finished: ${j.added} added • ${j.newFound} new found • ${j.total} total`:j.error);load()}
  async function removeUnknownPlatforms(){
@@ -53,6 +54,7 @@ async function repairPlatforms(){setMsg("Scanning existing avatars with unknown 
   <section className="card"><h2>Providers</h2><p className="muted">Turn a provider off if it blocks Ava-Valt, is unreliable, or you no longer want to query it.</p>
    {Object.entries(s.providerEnabled).map(([k,v])=><label key={k} style={{display:"block",margin:"10px 0"}}><input type="checkbox" checked={v} onChange={e=>{const p={...s.providerEnabled,[k]:e.target.checked};setS({...s,providerEnabled:p});save({providerEnabled:p})}}/> {k}</label>)}
   </section>
+  <section className="card"><h2>VRChat API fallback</h2>{vrc?<><div className={"status "+(vrc.connected?"good":"")}><b>{vrc.state}</b></div>{vrc.connected?<p>Connected{vrc.user?` as ${vrc.user}`:""} • {vrc.source}</p>:<p className="muted">{vrc.message}</p>}<button className="secondary" onClick={loadVrc}>CHECK VRCHAT CONNECTION</button></>:<p className="muted">Checking VRChat connection...</p>}<p className="muted">Used only as the final platform-metadata fallback. Credentials/cookies stay server-side and are never returned to this page.</p></section>
   <section className="card"><h2>Platform database health</h2>
  {health?<><div className={"status "+(health.done?"good":"")}><b>{health.done?"PLATFORM REPAIR COMPLETE":"REPAIR STILL NEEDED"}</b></div>
  <p><b>{health.total}</b> total avatars • <b>{health.complete}</b> with platform data • <b>{health.unknown}</b> still unknown</p>
