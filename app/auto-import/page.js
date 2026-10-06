@@ -7,7 +7,18 @@ export default function AutoImport(){
  useEffect(()=>{load();loadHealth();const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
  async function save(patch){setMsg("Saving...");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const j=await r.json();if(r.ok){setS(j);setMsg("Saved.")}else setMsg(j.error||"Could not save")}
  async function run(){setMsg("Running importer...");const r=await fetch("/api/import/auto",{method:"POST"});const j=await r.json();setMsg(r.ok?`Finished: ${j.added} added • ${j.newFound} new found • ${j.total} total`:j.error);load()}
- async function repairAllPlatforms(){
+ async function removeUnknownPlatforms(){
+  const count=health?.unknown??0;
+  if(!count){setMsg("There are no Unknown platform avatars to remove.");return}
+  if(!confirm(`WARNING: This will permanently remove ${count} avatar record(s) whose platform is still Unknown from avatar-index.json.\n\nRepair them first if you want to keep them.\n\nContinue?`))return;
+  if(!confirm(`Final confirmation: remove all ${count} unresolved Unknown-platform avatars?`))return;
+  setMsg(`Removing ${count} unresolved Unknown-platform avatars...`);
+  const r=await fetch("/api/db/remove-unknown-platforms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:"REMOVE_UNKNOWN"})});
+  const j=await r.json();
+  setMsg(r.ok?`Removed ${j.removed} Unknown-platform avatar record(s). Database now contains ${j.total} avatars.`:(j.error||"Removal failed"));
+  if(r.ok)await loadHealth();
+}
+async function repairAllPlatforms(){
   if(!confirm("Repair all remaining Unknown platform records? This may take a while and will use the enabled avatar providers."))return;
   setMsg("Repairing ALL remaining Unknown platforms — keep this page open...");
   let totalFixed=0,totalChecked=0,lastRemaining=null,noProgress=0;
@@ -49,7 +60,7 @@ async function repairPlatforms(){setMsg("Scanning existing avatars with unknown 
  {health.done&&<p><b>✓ All database records contain platform data.</b></p>}</>:<p className="muted">Counting database records...</p>}
  </section>
  <section className="card"><h2>Repair existing platform data</h2><p className="muted">Checks existing avatars that have no PC / Android / iOS data against enabled providers by avatar ID. It only fills platform data when a provider actually reports it; it does not guess.</p><button onClick={repairAllPlatforms}>FIX ALL REMAINING UNKNOWN</button>
- <button className="secondary" onClick={repairPlatforms}>SCAN & FIX NEXT 50</button></section>
+ <button className="secondary" onClick={repairPlatforms}>SCAN & FIX NEXT 50</button> <button className="danger" onClick={removeUnknownPlatforms} disabled={!health?.unknown}>REMOVE REMAINING UNKNOWN</button></section>
  <section className="card"><h2>Provider health from last run</h2>{!s.lastHealth?.length?<p className="muted">No run data yet.</p>:s.lastHealth.slice(-30).map((h,i)=><p key={i}><b>{h.provider}</b> — {h.state}{h.count?` • ${h.count} results`:""}{h.error?` • ${h.error}`:""} <span className="muted">({h.term})</span></p>)}</section>
   <p>{msg}</p>
  </main>
