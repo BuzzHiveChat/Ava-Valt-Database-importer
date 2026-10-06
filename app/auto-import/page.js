@@ -2,7 +2,7 @@
 import {useEffect,useState} from "react";
 export default function AutoImport(){
  const [s,setS]=useState(null),[msg,setMsg]=useState(""),[health,setHealth]=useState(null);
- async function loadHealth(){try{const r=await fetch("/api/db/platform-health",{cache:"no-store"});if(r.ok)setHealth(await r.json())}catch{}}
+ async function loadHealth(){try{const r=await fetch(`/api/db/platform-health?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setHealth(await r.json())}catch{}}
  async function load(){const r=await fetch("/api/settings"); if(r.ok)setS(await r.json())}
  useEffect(()=>{load();loadHealth();const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
  async function save(patch){setMsg("Saving...");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const j=await r.json();if(r.ok){setS(j);setMsg("Saved.")}else setMsg(j.error||"Could not save")}
@@ -15,7 +15,7 @@ export default function AutoImport(){
   setMsg(`Removing ${count} unresolved Unknown-platform avatars...`);
   const r=await fetch("/api/db/remove-unknown-platforms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirm:"REMOVE_UNKNOWN"})});
   const j=await r.json();
-  setMsg(r.ok?`Removed ${j.removed} Unknown-platform avatar record(s). Database now contains ${j.total} avatars.`:(j.error||"Removal failed"));
+  setMsg(r.ok?`Removed ${j.removed} Unknown-platform avatar record(s) from GitHub. Refreshing database health…`:(j.error||"Removal failed"));
   if(r.ok)await loadHealth();
 }
 async function repairAllPlatforms(){

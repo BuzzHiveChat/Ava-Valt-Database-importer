@@ -1,3 +1,5 @@
+export const dynamic="force-dynamic";
+export const revalidate=0;
 
 import {authorized} from "../../../../lib/guard";
 import {readDb} from "../../../../lib/db";
