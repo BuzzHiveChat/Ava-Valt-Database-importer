@@ -29,7 +29,27 @@ export default function AutoImport(){
  }
  useEffect(()=>{load();loadHealth();fetch("/api/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(u=>{setMe(u);if(u?.isOwner){loadVrc();loadIntegrity()}}).catch(()=>{});const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
  async function save(patch){setMsg("Saving...");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const j=await r.json();if(r.ok){setS(j);setMsg("Saved.")}else setMsg(j.error||"Could not save")}
- async function run(){setMsg("Running importer — watch the status above for the current stage...");const r=await fetch("/api/import/auto",{method:"POST"});const j=await r.json();if(r.ok){const b=j.breakdown||{};setMsg(`Finished: ${j.added||0} added • ${j.newFound||0} new candidates • ${b.resolvedByLookup||0} resolved by lookup • ${b.quarantined||0} quarantined • ${j.total||0} live total`)}else setMsg(j.error);load()}
+ async function run(){
+  setMsg("Running importer — watch the status above for the current stage...");
+  try{
+    const r=await fetch("/api/import/auto",{method:"POST"});
+    const j=await r.json();
+    if(!r.ok){setMsg(j.error||`Import failed (HTTP ${r.status})`);return}
+    if(j.skipped){setMsg(`AUTO IMPORT SKIPPED: ${j.reason||"No import was performed."}`);return}
+    // Never show a fake zero when an import response is missing numeric fields.
+    if(!Number.isFinite(j.added)||!Number.isFinite(j.newFound)){
+      setMsg("IMPORT STATUS INCOMPLETE: Server did not return its added/found counts. Refresh the status above to check the last run.");return;
+    }
+    let total=j.total;
+    if(!Number.isFinite(total)){
+      const db=await fetch("/api/db",{cache:"no-store"}).then(x=>x.ok?x.json():null).catch(()=>null);
+      total=Number.isFinite(db?.count)?db.count:null;
+    }
+    const b=j.breakdown||{};
+    setMsg(`AUTO IMPORT FINISHED: ${j.added} added • ${j.newFound} new candidates • ${b.resolvedByLookup??"?"} resolved by lookup • ${b.quarantined??"?"} quarantined • ${total===null?"unknown":total} live total`);
+  }catch(e){setMsg(`AUTO IMPORT REQUEST FAILED: ${e.message}`)}
+  finally{load()}
+}
 
  async function strictCleanup(){
   if(!confirm("Make the LIVE Ava-Valt database contain 0 Unknown platform records? Unresolved avatars will NOT be deleted — they will be moved to unknown-platform-quarantine.json and retried later."))return;
@@ -71,7 +91,7 @@ async function repairAllPlatforms(){
 async function repairPlatforms(){setMsg("Scanning existing avatars with unknown platform data...");const r=await fetch("/api/db/repair-platforms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({limit:50})});const j=await r.json();setMsg(r.ok?`Platform repair: checked ${j.checked}, fixed ${j.fixed}. ${j.remaining===0?"Repair complete!":"Run again to continue."}`:j.error);if(r.ok)loadHealth()}
  if(!s)return <main className="wrap"><h1>Auto Import</h1><p>Loading controls...</p>{msg&&<div className="card"><b>{msg}</b></div>}<p><a className="button secondary" href="/">Back to importer</a></p></main>;
  return <main className="wrap">
-  <div className="top"><div><div className="eyebrow">AVA-VALT CONTROL CENTRE</div><h1>Auto Import</h1><p className="muted">{me?.isOwner?"Owner controls for scheduled database discovery.":"High Staff access — safe import and repair tools only."}</p></div><a className="button secondary" href="/">Back to importer</a></div>
+  <div className="top"><div><div className="eyebrow">AVA-VALT CONTROL CENTRE</div><h1>Auto Import</h1>{me?.isOwner&&<p><a href="/search-export">Publish GitHub Search Shards (Beta) →</a></p>}<p className="muted">{me?.isOwner?"Owner controls for scheduled database discovery.":"High Staff access — safe import and repair tools only."}</p></div><a className="button secondary" href="/">Back to importer</a></div>
   <section className="card">
    <div className="row"><div><h2>Automatic adding</h2><p className="muted">{s.stopRequested?"Stop requested. The current import will finish safely, then automatic importing will stop.":s.running?"An import is currently running.":s.enabled?"Auto Import is ON. When a run finishes, it stays armed and waits for the next scheduled run until you press Stop.":"Auto Import is OFF. Scheduled runs will not modify the database."}</p></div>
    {me?.isOwner?<button className={s.enabled?"danger":""} onClick={()=>save({enabled:!s.enabled})}>{(s.enabled||s.running)?"STOP AUTO IMPORT":"START AUTO IMPORT"}</button>:<span className="muted">Owner controls locked</span>}</div>
