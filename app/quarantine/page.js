@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useState} from "react";
 
 export default function Quarantine(){
- const [me,setMe]=useState(null),[data,setData]=useState(null),[page,setPage]=useState(1),[search,setSearch]=useState("");
+ const [me,setMe]=useState(null),[data,setData]=useState(null),[page,setPage]=useState(1),[search,setSearch]=useState(""),[settings,setSettings]=useState(null);
  const [draft,setDraft]=useState({}),[selected,setSelected]=useState({}),[msg,setMsg]=useState(""),[busy,setBusy]=useState(false);
 
  async function load(p=page,q=search){
@@ -10,8 +10,26 @@ export default function Quarantine(){
   if(r.status===403){setData({error:"Owner access required"});return}
   const j=await r.json();setData(j);
  }
+ async function loadSettings(){
+  const r=await fetch(`/api/settings?t=${Date.now()}`,{cache:"no-store"});
+  if(r.ok)setSettings(await r.json());
+ }
+ async function saveAuto(patch){
+  const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
+  const j=await r.json();
+  if(!r.ok)return setMsg(j.error||"Could not save automatic repair settings.");
+  setSettings(j);setMsg("Automatic quarantine repair settings saved.");
+ }
+ async function runAutoRepair(){
+  setBusy(true);setMsg("Automatically checking quarantined avatars now...");
+  const r=await fetch("/api/quarantine/repair",{method:"POST"});
+  const j=await r.json();setBusy(false);
+  if(!r.ok)return setMsg(j.error||"Automatic quarantine repair failed.");
+  setMsg(`Automatic repair finished: ${j.checked||0} checked • ${j.restored||0} restored • ${j.remaining||0} still quarantined.`);
+  await Promise.all([load(page,search),loadSettings()]);
+ }
  useEffect(()=>{
-  fetch("/api/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(u=>{setMe(u);if(u?.isOwner)load(1,"")});
+  fetch("/api/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(u=>{setMe(u);if(u?.isOwner){load(1,"");loadSettings()}});
  },[]);
 
  function platformsFor(id){return draft[id]||[]}
@@ -58,6 +76,28 @@ export default function Quarantine(){
   <p className="muted">Manually check an avatar on the VRChat website, tick every platform it really supports, then add it back to the live database. This never guesses platform support.</p>
 
   {msg&&<div className="card"><b>{msg}</b></div>}
+
+  <section className="card">
+   <div className="eyebrow">AUTOMATIC REPAIR</div>
+   <h2 style={{marginTop:6}}>Auto Quarantine Repair</h2>
+   <p className="muted">Vercel automatically retries quarantined avatars using the VRChat API and enabled metadata providers. Verified avatars are restored to the live database; unresolved avatars stay safely quarantined.</p>
+   {settings&&<>
+    <label style={{display:"block",marginBottom:12}}>
+     <input type="checkbox" checked={settings.autoQuarantineRepair!==false} onChange={e=>saveAuto({autoQuarantineRepair:e.target.checked})}/> Automatic quarantine repair
+    </label>
+    <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"end"}}>
+     <label>Avatars per automatic pass<br/><input type="number" min="1" max="100" value={settings.quarantineRepairBatch||12} onChange={e=>setSettings({...settings,quarantineRepairBatch:+e.target.value})}/></label>
+     <label>Base retry cooldown (hours)<br/><input type="number" min="1" max="168" value={settings.quarantineRetryCooldownHours||12} onChange={e=>setSettings({...settings,quarantineRetryCooldownHours:+e.target.value})}/></label>
+     <button onClick={()=>saveAuto({quarantineRepairBatch:settings.quarantineRepairBatch,quarantineRetryCooldownHours:settings.quarantineRetryCooldownHours})}>SAVE AUTO SETTINGS</button>
+     <button disabled={busy} onClick={runAutoRepair}>RUN AUTO REPAIR NOW</button>
+    </div>
+    <p style={{marginTop:14}}>
+     Last automatic pass: <b>{settings.lastQuarantineRepair?new Date(settings.lastQuarantineRepair).toLocaleString():"Never"}</b><br/>
+     Checked: <b>{settings.lastQuarantineChecked||0}</b> • Restored: <b>{settings.lastQuarantineRestored||0}</b> • Remaining: <b>{settings.lastQuarantineRemaining??data?.total??"—"}</b>
+    </p>
+    {settings.lastQuarantineError&&<p className="error">{settings.lastQuarantineError}</p>}
+   </>}
+  </section>
 
   <section className="card">
    <form onSubmit={submitSearch} style={{display:"flex",gap:8,alignItems:"center"}}>
