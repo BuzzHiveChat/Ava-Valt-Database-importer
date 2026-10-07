@@ -35,10 +35,10 @@ export default function Home(){
   }
   async function remove(){const id=prompt("Avatar ID to remove (avtr_...)");if(!id)return;const r=await fetch("/api/db/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});const j=await r.json();setStatus(r.ok?`Removed ${id}. Database now ${j.total}.`:j.error);if(r.ok)load()}
  return <main><h1>Ava-Valt Admin</h1><div className="muted">Manage the live avatar database without opening Unity.</div>
- <div className="card row"><b>{stats?stats.count.toLocaleString():"…"} avatars online</b><span className="muted">Updated: {stats?.updated||"…"}</span><button onClick={load}>Refresh</button>{autoState?.running
+ <div className="card"><div className={"status "+(autoState?.enabled?"good":"")}><b>{autoState?.stopRequested?"STOP REQUESTED":autoState?.running?"AUTO IMPORT RUNNING":autoState?.enabled?"AUTO IMPORT ON — WAITING FOR NEXT RUN":"AUTO IMPORT OFF"}</b></div><div className="row"><b>{stats?stats.count.toLocaleString():"…"} avatars online</b><span className="muted">Updated: {stats?.updated||"…"}</span><button onClick={load}>Refresh</button>{autoState?.running
  ? <button className="danger" onClick={requestAutoStop} disabled={autoState?.stopRequested}>{autoState?.stopRequested?"STOP REQUESTED — FINISHING":"STOP AFTER THIS RUN"}</button>
  : <button onClick={autoImport}>RUN AUTO IMPORT NOW</button>}
- <a className="button secondary" href="/auto-import">AUTO IMPORT SETTINGS</a><button className="danger" onClick={remove}>Remove by ID</button></div>
+ <a className="button secondary" href="/auto-import">AUTO IMPORT SETTINGS</a><button className="danger" onClick={remove}>Remove by ID</button></div></div>
  <div className="card"><div className="row"><select value={mode} onChange={e=>setMode(e.target.value)}><option value="latest">Latest</option><option value="random">Random</option><option value="search">Search</option></select><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Avatar name, author, or avtr_ ID"/><button onClick={search}>RUN</button><button onClick={add}>ADD SELECTED TO GITHUB</button></div><p className="muted">{status}</p></div>
  <div className="grid">{results.map(a=><div className="avatar" key={a.id}><input type="checkbox" checked={!!selected[a.id]} onChange={e=>setSelected({...selected,[a.id]:e.target.checked})}/>{a.thumbnailImageUrl||a.imageUrl?<img src={a.thumbnailImageUrl||a.imageUrl}/>:null}<b>{a.name}</b><div className="muted">{a.author}</div><small>{a.id}</small><div style={{clear:"both"}}/></div>)}</div></main>
 }

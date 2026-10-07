@@ -41,9 +41,9 @@ async function repairPlatforms(){setMsg("Scanning existing avatars with unknown 
  return <main className="wrap">
   <div className="top"><div><div className="eyebrow">AVA-VALT CONTROL CENTRE</div><h1>Auto Import</h1><p className="muted">Control scheduled database discovery without opening Unity.</p></div><a className="button secondary" href="/">Back to importer</a></div>
   <section className="card">
-   <div className="row"><div><h2>Automatic adding</h2><p className="muted">{s.stopRequested?"Stop requested. The current import will finish safely, then automatic importing will stop.":s.running?"An import is currently running.":s.enabled?"Scheduled runs are allowed to add new unique avatars.":"Scheduled runs are stopped and will not modify the database."}</p></div>
+   <div className="row"><div><h2>Automatic adding</h2><p className="muted">{s.stopRequested?"Stop requested. The current import will finish safely, then automatic importing will stop.":s.running?"An import is currently running.":s.enabled?"Auto Import is ON. When a run finishes, it stays armed and waits for the next scheduled run until you press Stop.":"Auto Import is OFF. Scheduled runs will not modify the database."}</p></div>
    <button className={s.enabled?"danger":""} onClick={()=>save({enabled:!s.enabled})}>{(s.enabled||s.running)?"STOP AUTO IMPORT":"START AUTO IMPORT"}</button></div>
-   <div className={"status "+(s.enabled?"good":"")}><b>{s.stopRequested?"STOP REQUESTED — FINISHING CURRENT RUN":s.running?"RUNNING":s.enabled?"READY / AUTO ON":"STOPPED"}</b></div>
+   <div className={"status "+(s.enabled?"good":"")}><b>{s.stopRequested?"STOP REQUESTED — FINISHING CURRENT RUN":s.running?"RUNNING":s.enabled?"AUTO ON — WAITING FOR NEXT RUN":"STOPPED"}</b></div>
    <button onClick={run}>RUN ONCE NOW</button>
   </section>
   <section className="grid">
