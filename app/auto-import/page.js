@@ -1,11 +1,11 @@
 "use client";
 import {useEffect,useState} from "react";
 export default function AutoImport(){
- const [s,setS]=useState(null),[msg,setMsg]=useState(""),[health,setHealth]=useState(null),[vrc,setVrc]=useState(null),[me,setMe]=useState(null);
+ const [s,setS]=useState(null),[msg,setMsg]=useState(""),[health,setHealth]=useState(null),[vrc,setVrc]=useState(null),[me,setMe]=useState(null),[integrity,setIntegrity]=useState(null);
  async function loadHealth(){try{const r=await fetch(`/api/db/platform-health?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setHealth(await r.json())}catch{}}
  async function load(){const r=await fetch("/api/settings"); if(r.ok)setS(await r.json())}
  async function loadVrc(){try{const r=await fetch(`/api/vrchat/status?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setVrc(await r.json())}catch{}}
- useEffect(()=>{load();loadHealth();fetch("/api/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(u=>{setMe(u);if(u?.isOwner)loadVrc()}).catch(()=>{});const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
+ useEffect(()=>{load();loadHealth();fetch("/api/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(u=>{setMe(u);if(u?.isOwner){loadVrc();loadIntegrity()}}).catch(()=>{});const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
  async function save(patch){setMsg("Saving...");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const j=await r.json();if(r.ok){setS(j);setMsg("Saved.")}else setMsg(j.error||"Could not save")}
  async function run(){setMsg("Running importer — watch the status above for the current stage...");const r=await fetch("/api/import/auto",{method:"POST"});const j=await r.json();if(r.ok){const b=j.breakdown||{};setMsg(`Finished: ${j.added||0} added • ${j.newFound||0} new candidates • ${b.resolvedByLookup||0} resolved by lookup • ${b.quarantined||0} quarantined • ${j.total||0} live total`)}else setMsg(j.error);load()}
 
@@ -65,6 +65,12 @@ async function repairPlatforms(){setMsg("Scanning existing avatars with unknown 
    {Object.entries(s.providerEnabled).map(([k,v])=><label key={k} style={{display:"block",margin:"10px 0"}}><input type="checkbox" checked={v} onChange={e=>{const p={...s.providerEnabled,[k]:e.target.checked};setS({...s,providerEnabled:p});save({providerEnabled:p})}}/> {k}</label>)}
   </section>}
   {me?.isOwner&&<section className="card"><h2>VRChat API fallback</h2>{vrc?<><div className={"status "+(vrc.connected?"good":"")}><b>{vrc.state}</b></div>{vrc.connected?<p>Connected{vrc.user?` as ${vrc.user}`:""} • {vrc.source}</p>:<p className="muted">{vrc.message}</p>}<button className="secondary" onClick={loadVrc}>CHECK VRCHAT CONNECTION</button></>:<p className="muted">Checking VRChat connection...</p>}<p className="muted">Used only as the final platform-metadata fallback. Credentials/cookies stay server-side and are never returned to this page.</p></section>}
+  {me?.isOwner&&<section className="card">
+   <h2>Database Integrity</h2>
+   <p><b>{integrity?.duplicateRecords??"—"}</b> duplicate record(s) • <b>{integrity?.duplicateGroups??"—"}</b> duplicated avatar ID group(s) • <b>{integrity?.invalidIds??"—"}</b> invalid/missing avatar ID(s)</p>
+   <p className="muted">Duplicates are checked by VRChat <code>avtr_...</code> ID, not avatar name. When duplicates are repaired, useful metadata and platform information are merged into one record.</p>
+   <button onClick={repairIntegrity}>CHECK & REPAIR DUPLICATES</button>
+  </section>}
   <section className="card"><h2>Platform database health</h2>
  {health?<><div className={"status "+(health.done?"good":"")}><b>{health.done?"PLATFORM REPAIR COMPLETE":"REPAIR STILL NEEDED"}</b></div>
  <p><b>{health.total}</b> live avatars • <b>{health.complete}</b> with platform data • <b>{health.unknown}</b> live Unknown</p><p><b>{health.quarantined||0}</b> unresolved avatar(s) safely preserved in platform quarantine for later retries.</p><p className="muted">Automatic quarantine repair: <b>{s.autoQuarantineRepair!==false?"ON":"OFF"}</b>{s.lastQuarantineRepair?` • last pass ${new Date(s.lastQuarantineRepair).toLocaleString()} • ${s.lastQuarantineRestored||0} restored`:""}</p>

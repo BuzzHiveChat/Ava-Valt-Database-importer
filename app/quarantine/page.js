@@ -39,6 +39,19 @@ export default function Quarantine(){
   setDraft({...draft,[id]:[...cur]});
  }
  function all(id){setDraft({...draft,[id]:["PC","Android","iOS"]})}
+ async function testKitsune(a){
+  setBusy(true);setMsg(`Checking KitsuneDB's public website for ${a.id}...`);
+  const r=await fetch("/api/providers/kitsune-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:a.id,name:a.name||""})});
+  const j=await r.json();setBusy(false);
+  if(!r.ok)return setMsg(j.error||"KitsuneDB test failed.");
+  if(j.platforms?.length){
+   setDraft({...draft,[a.id]:j.platforms});
+   setMsg(`KitsuneDB Website found: ${j.platforms.join(" + ")}. I ticked those platform boxes for you — review them, then VERIFY & ADD.`);
+  }else{
+   setMsg(`KitsuneDB Website returned no safe platform evidence for this avatar. ${j.attempts?.length||0} public page route(s) were tried.`);
+  }
+ }
+
  async function verifyOne(id){
   const platforms=platformsFor(id);
   if(!platforms.length)return setMsg("Choose PC, Android, iOS, or ALL first.");
@@ -128,6 +141,7 @@ export default function Quarantine(){
       </div>
       <div style={{marginTop:12,display:"flex",gap:8,flexWrap:"wrap"}}>
        <a className="button secondary" target="_blank" rel="noreferrer" href={`https://vrchat.com/home/avatar/${a.id}`}>OPEN ON VRCHAT</a>
+       <button className="secondary" disabled={busy} onClick={()=>testKitsune(a)}>TEST KITSUNEDB</button>
        <button disabled={busy||!ps.length} onClick={()=>verifyOne(a.id)}>VERIFY & ADD TO DATABASE</button>
       </div>
       <p className="muted" style={{marginTop:10}}>Last automatic retry: {a.lastPlatformRetryAt?new Date(a.lastPlatformRetryAt).toLocaleString():"Not retried yet"} • Reason: {a.quarantineReason||"Unknown platform"}</p>
