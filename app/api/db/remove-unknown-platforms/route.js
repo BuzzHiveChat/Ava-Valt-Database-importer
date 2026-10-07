@@ -1,8 +1,8 @@
 
-import {authorized} from "../../../../lib/guard";
+import {ownerAuthorized} from "../../../../lib/guard";
 import {removeUnknownPlatformAvatars} from "../../../../lib/db";
 export async function POST(req){
- if(!await authorized())return Response.json({error:"Unauthorized"},{status:401});
+ if(!await ownerAuthorized())return Response.json({error:"Owner access required"},{status:403});
  try{
   const b=await req.json().catch(()=>({}));
   if(b.confirm!=="REMOVE_UNKNOWN")return Response.json({error:"Confirmation required"},{status:400});

@@ -1,12 +1,12 @@
 
-import {authorized} from "../../../lib/guard";
+import {authorized,ownerAuthorized} from "../../../lib/guard";
 import {getSettings,saveSettings} from "../../../lib/settings";
 export async function GET(){
  if(!await authorized())return Response.json({error:"Unauthorized"},{status:401});
  return Response.json(await getSettings());
 }
 export async function POST(req){
- if(!await authorized())return Response.json({error:"Unauthorized"},{status:401});
+ if(!await ownerAuthorized())return Response.json({error:"Owner access required"},{status:403});
  const old=await getSettings(), body=await req.json(), clean={...old};
  if(typeof body.enabled==="boolean"){
    if(body.enabled){clean.enabled=true;clean.stopRequested=false}

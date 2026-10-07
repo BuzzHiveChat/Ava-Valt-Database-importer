@@ -3,6 +3,7 @@ export const revalidate=0;
 
 import {authorized} from "../../../../lib/guard";
 import {readDb} from "../../../../lib/db";
+import {quarantineStats} from "../../../../lib/platformQuarantine";
 export async function GET(){
  if(!await authorized())return Response.json({error:"Unauthorized"},{status:401});
  try{
@@ -16,6 +17,7 @@ export async function GET(){
    if(ps.some(x=>/android|quest/.test(x)))android++;
    if(ps.some(x=>/ios|iphone|ipad/.test(x)))ios++;
   }
-  return Response.json({total:db.avatars.length,complete,unknown,pc,android,ios,done:unknown===0});
+  const q=await quarantineStats().catch(()=>({quarantined:0}));
+  return Response.json({total:db.avatars.length,complete,unknown,pc,android,ios,quarantined:q.quarantined||0,done:unknown===0});
  }catch(e){return Response.json({error:e.message},{status:500})}
 }
