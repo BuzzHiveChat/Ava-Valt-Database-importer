@@ -80,7 +80,7 @@ export default function Quarantine(){
   <section className="card">
    <div className="eyebrow">AUTOMATIC REPAIR</div>
    <h2 style={{marginTop:6}}>Auto Quarantine Repair</h2>
-   <p className="muted">Vercel automatically retries quarantined avatars using the VRChat API and enabled metadata providers. Verified avatars are restored to the live database; unresolved avatars stay safely quarantined.</p>
+   <p className="muted">Vercel automatically retries quarantined avatars. KitsuneDB is checked first for PC / Quest(Android) / iOS platform evidence, then the other enabled metadata providers. The VRChat API is only an optional final fallback. Verified avatars are restored to the live database; unresolved avatars stay safely quarantined.</p>
    {settings&&<>
     <label style={{display:"block",marginBottom:12}}>
      <input type="checkbox" checked={settings.autoQuarantineRepair!==false} onChange={e=>saveAuto({autoQuarantineRepair:e.target.checked})}/> Automatic quarantine repair
