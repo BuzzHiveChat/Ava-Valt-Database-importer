@@ -3,8 +3,30 @@ import {useEffect,useState} from "react";
 export default function AutoImport(){
  const [s,setS]=useState(null),[msg,setMsg]=useState(""),[health,setHealth]=useState(null),[vrc,setVrc]=useState(null),[me,setMe]=useState(null),[integrity,setIntegrity]=useState(null);
  async function loadHealth(){try{const r=await fetch(`/api/db/platform-health?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setHealth(await r.json())}catch{}}
- async function load(){const r=await fetch("/api/settings"); if(r.ok)setS(await r.json())}
+ async function load(){try{const r=await fetch(`/api/settings?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setS(await r.json());else{const j=await r.json().catch(()=>({}));setMsg(j.error||"Could not load Auto Import settings.")}}catch(e){setMsg(`Could not load Auto Import settings: ${e.message}`)}}
  async function loadVrc(){try{const r=await fetch(`/api/vrchat/status?t=${Date.now()}`,{cache:"no-store"});if(r.ok)setVrc(await r.json())}catch{}}
+ async function loadIntegrity(){
+  try{
+   const r=await fetch(`/api/db/integrity?t=${Date.now()}`,{cache:"no-store"});
+   if(r.ok)setIntegrity(await r.json());
+   else {
+    const j=await r.json().catch(()=>({}));
+    setMsg(j.error||"Could not load database integrity.");
+   }
+  }catch(e){setMsg(`Could not load database integrity: ${e.message}`)}
+ }
+ async function repairIntegrity(){
+  if(!confirm("Check avatar-index.json for duplicate avtr_ IDs and merge duplicate records safely?"))return;
+  setMsg("Checking database integrity...");
+  try{
+   const r=await fetch("/api/db/integrity",{method:"POST"});
+   const j=await r.json();
+   if(!r.ok){setMsg(j.error||"Database integrity check failed.");return}
+   setIntegrity(j);
+   setMsg(`Database integrity complete: ${j.duplicateRecords||0} duplicate record(s) found${j.repaired?" and merged":""} • ${j.uniqueAvatarIds||0} unique avatar IDs • ${j.invalidIds||0} invalid/missing IDs.`);
+   await Promise.all([load(),loadHealth()]);
+  }catch(e){setMsg(`Database integrity check failed: ${e.message}`)}
+ }
  useEffect(()=>{load();loadHealth();fetch("/api/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(u=>{setMe(u);if(u?.isOwner){loadVrc();loadIntegrity()}}).catch(()=>{});const t=setInterval(()=>{load();loadHealth()},4000);return()=>clearInterval(t)},[]);
  async function save(patch){setMsg("Saving...");const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});const j=await r.json();if(r.ok){setS(j);setMsg("Saved.")}else setMsg(j.error||"Could not save")}
  async function run(){setMsg("Running importer — watch the status above for the current stage...");const r=await fetch("/api/import/auto",{method:"POST"});const j=await r.json();if(r.ok){const b=j.breakdown||{};setMsg(`Finished: ${j.added||0} added • ${j.newFound||0} new candidates • ${b.resolvedByLookup||0} resolved by lookup • ${b.quarantined||0} quarantined • ${j.total||0} live total`)}else setMsg(j.error);load()}
@@ -47,7 +69,7 @@ async function repairAllPlatforms(){
   await loadHealth();
 }
 async function repairPlatforms(){setMsg("Scanning existing avatars with unknown platform data...");const r=await fetch("/api/db/repair-platforms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({limit:50})});const j=await r.json();setMsg(r.ok?`Platform repair: checked ${j.checked}, fixed ${j.fixed}. ${j.remaining===0?"Repair complete!":"Run again to continue."}`:j.error);if(r.ok)loadHealth()}
- if(!s)return <main className="wrap"><h1>Auto Import</h1><p>Loading controls...</p></main>;
+ if(!s)return <main className="wrap"><h1>Auto Import</h1><p>Loading controls...</p>{msg&&<div className="card"><b>{msg}</b></div>}<p><a className="button secondary" href="/">Back to importer</a></p></main>;
  return <main className="wrap">
   <div className="top"><div><div className="eyebrow">AVA-VALT CONTROL CENTRE</div><h1>Auto Import</h1><p className="muted">{me?.isOwner?"Owner controls for scheduled database discovery.":"High Staff access — safe import and repair tools only."}</p></div><a className="button secondary" href="/">Back to importer</a></div>
   <section className="card">
