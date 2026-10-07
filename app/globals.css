@@ -5,3 +5,5 @@ textarea{width:100%;box-sizing:border-box}.danger{border-color:#ff6b81}.status{d
 .importBanner.running{border-color:#5fbe8b}.importBanner.ready{border-color:#7b55c7}.importBanner.stopped{opacity:.9}
 .importBanner span{opacity:.72;margin-left:8px}.button{display:inline-block;text-decoration:none}
 button:disabled{opacity:.55;cursor:not-allowed}
+
+.pill{display:inline-block;margin:6px 6px 0 0;padding:3px 8px;border:1px solid #6b4aa0;border-radius:999px;font-size:12px;font-weight:700}

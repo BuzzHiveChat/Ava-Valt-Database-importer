@@ -20,7 +20,8 @@ export default function Home(){
  const load=async()=>{const r=await fetch("/api/db"); if(r.status===401){location="/login";return} const j=await r.json();setStats(j)};
  useEffect(()=>{load()},[]);
  async function search(){setStatus("Searching providers...");const r=await fetch("/api/import/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,mode,limit:120})});const j=await r.json();if(!r.ok){setStatus(j.error);return}setResults(j.avatars);setStatus(`${j.avatars.length} unique results • ${j.notes.join(" • ")}`)}
- async function add(){const avatars=results.filter(a=>selected[a.id]);if(!avatars.length)return setStatus("Select at least one avatar.");setStatus("Updating GitHub...");const r=await fetch("/api/import/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({avatars})});const j=await r.json();setStatus(r.ok?`Added ${j.added}; updated ${j.updated}; database now ${j.total}.`:j.error);if(r.ok)load()}
+ function platformLabels(a){const raw=Array.isArray(a?.platforms)?a.platforms:String(a?.platforms||"").split(/[•,]/);const out=[];for(const v of raw){const p=String(v).toLowerCase();if((p==="pc"||p.includes("windows"))&&!out.includes("PC"))out.push("PC");else if((p.includes("android")||p.includes("quest"))&&!out.includes("Android"))out.push("Android");else if(p.includes("ios")&&!out.includes("iOS"))out.push("iOS")}return out}
+ async function add(){const avatars=results.filter(a=>selected[a.id]);if(!avatars.length)return setStatus("Select at least one avatar.");setStatus("Checking platforms and updating GitHub...");const r=await fetch("/api/import/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({avatars})});const j=await r.json();setStatus(r.ok?`Added ${j.added}; updated ${j.updated}; ${j.quarantined||0} unresolved moved to quarantine; database now ${j.total}.`:j.error);if(r.ok)load()}
  async function autoImport(){
     if(autoState?.running){setStatus("An import is already running.");return}
     setStatus("Starting importer — status will update above while it works...");
@@ -28,7 +29,10 @@ export default function Home(){
     try{
       const r=await fetch("/api/import/auto",{method:"POST"});
       const j=await r.json();
-      setStatus(r.ok?`AUTO IMPORT FINISHED: ${j.added||0} added • ${j.newFound||0} new found • ${j.total||0} total${j.conflicts?` • ${j.conflicts} GitHub conflict(s) safely retried`:""}.`:j.error);
+      if(r.ok){
+        const b=j.breakdown||{};
+        setStatus(`AUTO IMPORT FINISHED: ${j.added||0} added • ${j.newFound||0} new candidates • ${b.resolvedByLookup||0} platform(s) resolved by lookup • ${b.quarantined||0} quarantined • ${j.total||0} live total${j.conflicts?` • ${j.conflicts} GitHub conflict(s) safely retried`:""}.`);
+      }else setStatus(j.error);
       if(r.ok)load();
     }catch(e){setStatus("The browser lost the import request. Check importer status; the server may still be finishing it.")}
     finally{loadAutoState()}
@@ -40,5 +44,5 @@ export default function Home(){
  : <button onClick={autoImport}>RUN AUTO IMPORT NOW</button>}
  <a className="button secondary" href="/auto-import">{me?.isOwner?"AUTO IMPORT SETTINGS":"IMPORT STATUS"}</a>{me?.isOwner&&<button className="danger" onClick={remove}>Remove by ID</button>}</div></div>
  <div className="card"><div className="row"><select value={mode} onChange={e=>setMode(e.target.value)}><option value="latest">Latest</option><option value="random">Random</option><option value="search">Search</option></select><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Avatar name, author, or avtr_ ID"/><button onClick={search}>RUN</button><button onClick={add}>ADD SELECTED TO GITHUB</button></div><p className="muted">{status}</p></div>
- <div className="grid">{results.map(a=><div className="avatar" key={a.id}><input type="checkbox" checked={!!selected[a.id]} onChange={e=>setSelected({...selected,[a.id]:e.target.checked})}/>{a.thumbnailImageUrl||a.imageUrl?<img src={a.thumbnailImageUrl||a.imageUrl}/>:null}<b>{a.name}</b><div className="muted">{a.author}</div><small>{a.id}</small><div style={{clear:"both"}}/></div>)}</div></main>
+ <div className="grid">{results.map(a=><div className="avatar" key={a.id}><input type="checkbox" checked={!!selected[a.id]} onChange={e=>setSelected({...selected,[a.id]:e.target.checked})}/>{a.thumbnailImageUrl||a.imageUrl?<img src={a.thumbnailImageUrl||a.imageUrl}/>:null}<b>{a.name}</b><div className="muted">{a.author}</div><small>{a.id}</small><div>{platformLabels(a).length?platformLabels(a).map(p=><span className="pill" key={p}>{p}</span>):<span className="muted">Platform will be verified before add</span>}</div><div style={{clear:"both"}}/></div>)}</div></main>
 }
