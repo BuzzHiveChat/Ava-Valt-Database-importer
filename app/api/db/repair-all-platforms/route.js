@@ -11,13 +11,12 @@ export async function POST(){
    const r=await repairExistingPlatforms({limit:50});
    fixed+=r.fixed;checked+=r.checked;remaining=r.remaining;batches++;
    if(remaining<=0||r.checked===0)break;
-   // If a whole batch yielded nothing, stop this invocation so we don't repeatedly
-   // hit the same unresolvable records.
-   if(r.fixed===0)break;
+   // V2.11 rotates checked unresolved records to the back, so a zero-fix batch
+   // no longer means later records cannot be repaired. Keep advancing while time allows.
   }
   return Response.json({ok:true,fixed,checked,remaining,batches,complete:remaining===0,
     continueNeeded:remaining>0,
-    note:remaining>0&&fixed===0?"Some remaining avatars could not be identified by the enabled providers.":""
+    note:remaining>0&&fixed===0?"This pass found no platform metadata, but the repair cursor advanced to later Unknown records.":""
   });
  }catch(e){return Response.json({error:e.message,fixed,checked,remaining,batches},{status:500})}
 }
