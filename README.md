@@ -39,9 +39,31 @@ scrapes VRChat or publishes avatar platform changes without confirmation.
 
 ## KitsuneDB platform evidence / IMPORT
 
-KitsuneDB (`https://avtr.fumikoecho.net/avatars`) is **already included**
-as the `KitsuneDB` import provider; leave its existing checkbox enabled.
+KitsuneDB (`https://avtr.fumikoecho.net/avatars`) is available as
+`KitsuneDB` under **IMPORT providers** on the main Admin page. Use
+**KITSUNEDB ONLY** to test it independently, or **SELECT ALL ENABLED** to
+search every provider allowed in Auto Import Settings. Each result shows the
+provider that supplied its platform evidence. Only enabled providers are
+queried in manual searches; changes to this search selection do not alter
+automatic import settings. The import response lists per-provider HTTP health.
+Duplicate-avatar results now retain valid platform evidence if the first
+provider returned none, and an empty provider list never triggers a search
+of all providers by accident.
 The exact-ID API resolver now understands PC + Quest -> PC + Android and
 provider boolean platform maps. The manual Needs Review page links to the
 KitsuneDB website for cases when its public VRCX response lacks platform fields.
 See `KITSUNEDB_INTEGRATION_FIX.md` for limitations and instructions.
+
+## Website versus Unity
+The Unity client and a serverless Vercel function do not share an IP address,
+network environment, authentication context or request headers. A provider may
+allow Unity/VRCX desktop traffic while restricting server/cloud traffic. An
+HTTP 400, 401, 403 or 429 cannot be solved by changing platform mapping or
+adding an extra query parameter indiscriminately; follow the provider docs
+and respect their rate limits/terms. This release improves local JSON parsing
+and exposes per-provider results, but does not guarantee third-party access.
+
+## Verification
+Run `npm run test` for isolated mocked-network tests, and `npm run build`
+with Node 20.9+ and installed dependencies to verify the Next.js compilation.
+No live provider or GitHub writes are made by the test suite.

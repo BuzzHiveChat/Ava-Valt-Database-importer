@@ -1,11 +1,20 @@
 # Ava-Valt — KitsuneDB platform/IMPORT correction
 
-## Already included in IMPORT
+## KitsuneDB on the main IMPORT page
 
-The website `https://avtr.fumikoecho.net/avatars` is **KitsuneDB**. The importer
-already has `KitsuneDB` in `AUTO IMPORT SETTINGS → Providers`, enabled by default.
-No second duplicate provider has been added. Manual IMPORT, auto-import
-discovery and platform enrichment still use KitsuneDB's public VRCX-compatible API.
+The website `https://avtr.fumikoecho.net/avatars` is **KitsuneDB**. It now appears
+under **IMPORT providers** on the main admin page, as well as under
+**AUTO IMPORT SETTINGS → Providers**. It is enabled by default.
+
+Choose **KITSUNEDB ONLY** to test its results without involving failing providers,
+or **SELECT ALL ENABLED** to run the normal multi-provider search. The search
+response shows the working/blocked/unavailable state of each selected provider.
+Manual selection does not change the saved auto-import settings.
+
+The parser now accepts a record with an empty `platforms` array but a separate
+`platformLabel`, skips negative or missing performance evidence, and retains
+KitsuneDB platform metadata if a different provider listed the same avatar
+first without platform evidence. No second duplicate provider was added.
 
 ## Platform Needs Review changes
 
@@ -30,9 +39,10 @@ discovery and platform enrichment still use KitsuneDB's public VRCX-compatible A
    **preserving their folders**, rather than moving them into an extra folder.
 2. Redeploy your `ava-valt-importer` Vercel project.
 3. In AUTO IMPORT SETTINGS, confirm `KitsuneDB` remains enabled.
-4. Open PLATFORM NEEDS REVIEW, pick an avatar and press LOOK UP KITSUNEDB API.
+4. On the main IMPORT page click **KITSUNEDB ONLY**, choose Search, and RUN. Check the result/provider status.
+5. Open PLATFORM NEEDS REVIEW, pick an avatar and press LOOK UP KITSUNEDB API.
    Check the exact-ID evidence before VERIFY & ADD.
-5. Optional auto worker: follow `PLATFORM_AUTO_REVIEW.md`, enable the GitHub
+6. Optional auto worker: follow `PLATFORM_AUTO_REVIEW.md`, enable the GitHub
    Actions workflow and `PLATFORM_REVIEW_AUTO_ENABLED=true` only after checking
    provider permissions. Use `PLATFORM_REVIEW_KITSUNE_FALLBACK=false` to disable
    KitsuneDB use by the hourly worker without removing it from IMPORT.

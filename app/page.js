@@ -16,10 +16,24 @@ export default function Home(){
     const r=await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:target})});
     const j=await r.json(); if(r.ok){setAutoState(j);setStatus(target?"Automatic importing enabled.":"Automatic importing stopped.")}else setStatus(j.error||"Could not update importer");
   }
+ const [manualProviders,setManualProviders]=useState(null);
+ const providerOptions=autoState?.providerEnabled||{};
+ const enabledProviders=Object.keys(providerOptions).filter(name=>providerOptions[name]);
+ const selectedProviders=manualProviders===null?enabledProviders:manualProviders.filter(name=>providerOptions[name]);
  const [stats,setStats]=useState(null),[q,setQ]=useState(""),[mode,setMode]=useState("latest"),[results,setResults]=useState([]),[selected,setSelected]=useState({}),[status,setStatus]=useState("Ready.");
  const load=async()=>{const r=await fetch("/api/db"); if(r.status===401){location="/login";return} const j=await r.json();setStats(j)};
  useEffect(()=>{load()},[]);
- async function search(){setStatus("Searching providers...");const r=await fetch("/api/import/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,mode,limit:120})});const j=await r.json();if(!r.ok){setStatus(j.error);return}setResults(j.avatars);setStatus(`${j.avatars.length} unique results • ${j.notes.join(" • ")}`)}
+ async function search(){
+   if(!selectedProviders.length){setStatus("Select at least one enabled IMPORT provider first.");return;}
+   setStatus(`Searching ${selectedProviders.join(", ")}...`);
+   try{
+    const r=await fetch("/api/import/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,mode,limit:120,providers:selectedProviders})});
+    const j=await r.json();
+    if(!r.ok){setStatus(j.error||`Search failed (HTTP ${r.status})`);return;}
+    setResults(j.avatars||[]);setSelected({});
+    setStatus(`${j.avatars.length} unique results • ${(j.notes||[]).join(" • ")}`);
+   }catch(e){setStatus(`Provider search failed: ${e.message}`);}
+  }
  function platformLabels(a){const raw=Array.isArray(a?.platforms)?a.platforms:String(a?.platforms||"").split(/[•,]/);const out=[];for(const v of raw){const p=String(v).toLowerCase();if((p==="pc"||p.includes("windows"))&&!out.includes("PC"))out.push("PC");else if((p.includes("android")||p.includes("quest"))&&!out.includes("Android"))out.push("Android");else if(p.includes("ios")&&!out.includes("iOS"))out.push("iOS")}return out}
  async function add(){const avatars=results.filter(a=>selected[a.id]);if(!avatars.length)return setStatus("Select at least one avatar.");setStatus("Checking platforms and updating GitHub...");const r=await fetch("/api/import/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({avatars})});const j=await r.json();setStatus(r.ok?`Added ${j.added}; updated ${j.updated}; ${j.excludedOrHeld||0} excluded/held for privacy; ${j.quarantined||0} unresolved moved to quarantine; database now ${j.total}.`:j.error);if(r.ok)load()}
  async function autoImport(){
@@ -43,6 +57,20 @@ export default function Home(){
  ? (me?.isOwner?<button className="danger" onClick={requestAutoStop} disabled={autoState?.stopRequested}>{autoState?.stopRequested?"STOP REQUESTED — FINISHING":"STOP AFTER THIS RUN"}</button>:null)
  : <button onClick={autoImport}>RUN AUTO IMPORT NOW</button>}
  <a className="button secondary" href="/auto-import">{me?.isOwner?"AUTO IMPORT SETTINGS":"IMPORT STATUS"}</a>{me?.isOwner&&<a className="button secondary" href="/quarantine">PLATFORM QUARANTINE</a>}{me?.isOwner&&<a className="button secondary" href="/platform-review">PLATFORM NEEDS REVIEW</a>}{me?.isOwner&&<a className="button secondary" href="/opt-outs">AVATAR OPT-OUTS</a>}{me?.isOwner&&<button className="danger" onClick={remove}>Remove by ID</button>}</div></div>
+ <div className="card">
+  <h2>IMPORT providers</h2>
+  <p className="muted">Choose which avatar databases to search. KitsuneDB is the provider behind avtr.fumikoecho.net. Disabled providers can be enabled in <a href="/auto-import">Auto Import Settings</a>. Selection here affects this manual search only.</p>
+  <div className="row" style={{marginBottom:10}}>
+   <button type="button" className="secondary" onClick={()=>setManualProviders(enabledProviders)}>SELECT ALL ENABLED</button>
+   <button type="button" className="secondary" disabled={!providerOptions.KitsuneDB} onClick={()=>setManualProviders(["KitsuneDB"])}>KITSUNEDB ONLY</button>
+  </div>
+  <div className="providerChooser">
+   {Object.entries(providerOptions).map(([name,enabled])=><label key={name} className="providerOption" style={{opacity:enabled?1:.55}}>
+    <input type="checkbox" disabled={!enabled} checked={enabled&&selectedProviders.includes(name)} onChange={e=>setManualProviders(e.target.checked?[...selectedProviders,name]:selectedProviders.filter(p=>p!==name))}/>
+    <span><strong>{name}</strong>{name==="KitsuneDB"&&<small>avtr.fumikoecho.net</small>}{!enabled&&<small>Disabled in settings</small>}</span>
+   </label>)}
+  </div>
+  </div>
  <div className="card"><div className="row"><select value={mode} onChange={e=>setMode(e.target.value)}><option value="latest">Latest</option><option value="random">Random</option><option value="search">Search</option></select><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Avatar name, author, or avtr_ ID"/><button onClick={search}>RUN</button><button onClick={add}>ADD SELECTED TO GITHUB</button></div><p className="muted">{status}</p></div>
- <div className="grid">{results.map(a=><div className="avatar" key={a.id}><input type="checkbox" checked={!!selected[a.id]} onChange={e=>setSelected({...selected,[a.id]:e.target.checked})}/>{a.thumbnailImageUrl||a.imageUrl?<img src={a.thumbnailImageUrl||a.imageUrl}/>:null}<b>{a.name}</b><div className="muted">{a.author}</div><small>{a.id}</small><div>{platformLabels(a).length?platformLabels(a).map(p=><span className="pill" key={p}>{p}</span>):<span className="muted">Platform will be verified before add</span>}</div><div style={{clear:"both"}}/></div>)}</div></main>
+ <div className="grid">{results.map(a=><div className="avatar" key={a.id}><input type="checkbox" checked={!!selected[a.id]} onChange={e=>setSelected({...selected,[a.id]:e.target.checked})}/>{a.thumbnailImageUrl||a.imageUrl?<img src={a.thumbnailImageUrl||a.imageUrl}/>:null}<b>{a.name}</b><div className="muted">{a.author}</div><small>{a.id}</small><div className="muted">Provider: {a.metadataProvider||"Unknown"}</div><div>{platformLabels(a).length?platformLabels(a).map(p=><span className="pill" key={p}>{p}</span>):<span className="muted">Platform will be verified before add</span>}</div><div style={{clear:"both"}}/></div>)}</div></main>
 }

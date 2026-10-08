@@ -13,6 +13,7 @@ export async function POST(req){
    else if(old.running){clean.stopRequested=true} else {clean.enabled=false;clean.stopRequested=false}
  }
  if(Number.isFinite(Number(body.maxAddPerRun)))clean.maxAddPerRun=Math.min(Math.max(Number(body.maxAddPerRun),1),1000);
+ if(typeof body.strictPlatformMode==="boolean")clean.strictPlatformMode=body.strictPlatformMode;
  if(Array.isArray(body.searchTerms))clean.searchTerms=body.searchTerms.map(String).map(x=>x.trim()).filter(Boolean).slice(0,50);
  if(body.providerEnabled&&typeof body.providerEnabled==="object")clean.providerEnabled={...old.providerEnabled,...body.providerEnabled};
  return Response.json(await saveSettings(clean,clean.stopRequested?"Request Ava-Valt importer stop":"Update Ava-Valt importer controls"));
