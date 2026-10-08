@@ -67,3 +67,13 @@ and exposes per-provider results, but does not guarantee third-party access.
 Run `npm run test` for isolated mocked-network tests, and `npm run build`
 with Node 20.9+ and installed dependencies to verify the Next.js compilation.
 No live provider or GitHub writes are made by the test suite.
+
+## Bulk import from Platform Needs Review
+
+After manually checking platform compatibility, tick the supported PC,
+Android and/or iOS boxes for the avatars you want to publish, then click
+**IMPORT ALL TICKED (N)**. Selections persist while changing pages/searches
+in the same browser session. The owner-only endpoint checks creator opt-outs,
+validates each avatar against the active review queue and updates the live
+GitHub database in groups of up to 50. Successful records are removed from
+review; rejected ones remain. See `DEPLOY_THIS_UPDATE.md`.

@@ -4,6 +4,7 @@ import {useEffect,useState} from "react";
 export default function PlatformReview(){
  const [me,setMe]=useState(null),[data,setData]=useState(null),[search,setSearch]=useState(""),[page,setPage]=useState(1);
  const [draft,setDraft]=useState({}),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
+ const ticked=Object.entries(draft).filter(([,platforms])=>Array.isArray(platforms)&&platforms.length>0);
  const load=async(p=page,q=search)=>{
   const r=await fetch(`/api/platform-review?page=${p}&pageSize=50&search=${encodeURIComponent(q)}&t=${Date.now()}`,{cache:"no-store"});
   const j=await r.json();setData(r.ok?j:{error:j.error||"Could not load review queue"});
@@ -46,9 +47,32 @@ export default function PlatformReview(){
   try{
    const r=await fetch("/api/platform-review",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,id:a.id,platforms})});
    const j=await r.json();if(!r.ok)throw new Error(j.error||"Update failed");
-   setMsg(action==="verify"?`Verified and added ${a.id}. ${j.remaining} left for review.`:`Dismissed ${a.id}. ${j.remaining} left for review.`);
+   setMsg(j.cleanupError|| (action==="verify"?`Verified and added ${a.id}. ${j.remaining} left for review.`:`Dismissed ${a.id}. ${j.remaining} left for review.`));
    setDraft(d=>{const next={...d};delete next[a.id];return next});await load(page,search);
   }catch(e){setMsg(e.message||String(e))}finally{setBusy(false)}
+ }
+ async function importAllTicked(){
+  const items=ticked.map(([id,platforms])=>({id,platforms}));
+  if(!items.length){setMsg("Tick at least one confirmed platform on each avatar you want to import.");return;}
+  if(!confirm(`IMPORT ${items.length} avatar(s) with their ticked platforms into the live GitHub database?\n\nOnly continue if you personally checked that every ticked platform is correct. Automatic suggestions alone are NOT proof.\n\nThe import will use batches of up to 50.`))return;
+  setBusy(true);
+  let succeeded=0,failed=0,added=0,updated=0;
+  const errors=[],warnings=[];
+  try{
+   for(let i=0;i<items.length;i+=50){
+    const batch=items.slice(i,i+50);
+    setMsg(`Importing selected avatars: ${i+1}–${i+batch.length} of ${items.length}...`);
+    const r=await fetch("/api/platform-review",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"verify-batch",items:batch})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||"Batch import failed");
+    succeeded+=j.succeeded||0;failed+=j.failed||0;added+=j.added||0;updated+=j.updated||0;
+    if(j.cleanupError)warnings.push(j.cleanupError);
+    const imported=new Set((j.results||[]).filter(x=>x.ok).map(x=>x.id));
+    setDraft(current=>{const next={...current};for(const id of imported)delete next[id];return next;});
+    errors.push(...(j.results||[]).filter(x=>!x.ok).map(x=>`${x.id||"Unknown ID"}: ${x.error}`));
+   }
+   setMsg(`Finished importing ${succeeded} of ${items.length} ticked avatar(s): ${added} new, ${updated} existing updated, ${failed} failed.${errors.length?` Failed: ${errors.slice(0,5).join(" | ")}${errors.length>5?" (more failures; see the remaining ticks)":""}.`:""}${warnings.length?` WARNING: ${warnings.join(" | ")}`:""}`);
+  }catch(e){setMsg(`Import stopped after ${succeeded} succeeded and ${failed} failed. Remaining ticks are still selected. ${e.message||String(e)}`);}
+  finally{setBusy(false);setPage(1);await load(1,search);}
  }
  if(!me)return <main><h1>Platform Needs Review</h1><p>Loading...</p></main>;
  if(!me.isOwner)return <main><h1>Platform Needs Review</h1><section className="card">Owner access required.</section></main>;
@@ -78,6 +102,11 @@ export default function PlatformReview(){
     <button disabled={busy} type="button" className="secondary" onClick={()=>{setSearch("");setPage(1);load(1,"")}}>CLEAR</button>
    </form>
    <p><b>{data?.total??"—"}</b> avatar(s) awaiting manual review.</p>
+   <p className="muted">Tick the confirmed PC / Android / iOS boxes on any avatars you want to add, then use the button below. You can also tick avatars on other pages; selections remain until you import, clear them or reload this page. Only you, the Owner, can use this.</p>
+   <div className="row">
+    <button type="button" disabled={busy||!ticked.length} onClick={importAllTicked}>IMPORT ALL TICKED ({ticked.length})</button>
+    <button type="button" className="secondary" disabled={busy||!ticked.length} onClick={()=>setDraft({})}>CLEAR ALL TICKS</button>
+   </div>
    {data?.error&&<p className="err">{data.error}</p>}
   </section>
   {(data?.avatars||[]).map(a=>{const selected=chosen(a.id);return <section key={a.id} className="card">
@@ -97,7 +126,7 @@ export default function PlatformReview(){
      {a.autoReviewResult&&a.autoReviewResult!=="SUGGESTED"&&<p className="muted">Automatic check: {a.autoReviewResult.replaceAll("_"," ")}</p>}
      <div className="row" style={{margin:"10px 0"}}>
       { ["PC","Android","iOS"].map(p=><label key={p}><input type="checkbox" checked={selected.includes(p)} onChange={()=>toggle(a.id,p)}/> {p}</label>)}
-      <button className="secondary" onClick={()=>setDraft(d=>({...d,[a.id]:["PC","Android","iOS"]}))}>ALL THREE</button>
+      <button className="secondary" disabled={busy} onClick={()=>setDraft(d=>({...d,[a.id]:["PC","Android","iOS"]}))}>ALL THREE</button>
      </div>
      <div className="row">
       <a className="button secondary" target="_blank" rel="noreferrer" href={`https://vrchat.com/home/avatar/${a.id}`}>OPEN VRCHAT</a>

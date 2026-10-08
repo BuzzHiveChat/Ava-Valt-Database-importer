@@ -48,3 +48,25 @@ Automated mock-network tests and static JS/JSX parser checks passed in the
 authoring environment. The Next.js production build was **not verified** there
 because installation of its dependencies timed out. After redeploying, check
 the Vercel deployment log for any build errors and test the importer UI.
+
+## New: IMPORT ALL TICKED on Platform Needs Review (8 October 2026)
+
+1. Open **Platform Needs Review** as the Owner.
+2. Manually verify the avatar's platforms using VRChat or a permitted provider.
+3. Tick PC, Android and/or iOS under each avatar. This is the selection for
+   bulk import; **do not use ALL THREE unless all three builds are confirmed**.
+4. Use **IMPORT ALL TICKED (N)** above the avatar cards and confirm once.
+5. The page sends up to 50 verified selections per request. Ticks are preserved
+   when paging/searching but cleared when the browser page is reloaded.
+6. Succeeded records are removed from Needs Review, while rejected records
+   stay there with their platform selections ticked for inspection and retry.
+
+Only the Owner can call the bulk endpoint. Records with creator opt-outs or
+unresolved opt-out markers are rejected. The backend saves additions and platform
+repairs in a single GitHub database commit per batch and retries SHA conflicts.
+If it cannot clear the review queue after database save, it displays a warning
+rather than claiming the database write failed; refreshing or re-verifying will
+be safe. Individual VERIFY & ADD now also repairs existing UNKNOWN entries.
+
+Run `npm run test` before deploying. The production build must still be checked
+on Vercel after uploading, because this ZIP does not ship dependencies.
