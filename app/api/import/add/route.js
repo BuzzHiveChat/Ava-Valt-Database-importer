@@ -4,13 +4,17 @@ import {getSettings} from "../../../../lib/settings";
 import {enrichNewAvatarsPlatforms} from "../../../../lib/enrich";
 import {quarantineRecords} from "../../../../lib/platformQuarantine";
 import {hasKnownPlatform} from "../../../../lib/platforms";
+import {readOptOuts,filterExcluded,stageMarkerRequests} from "../../../../lib/optOut";
 export const maxDuration=60;
 
 export async function POST(req){
  if(!await authorized())return Response.json({error:"Unauthorized"},{status:401});
  try{
   const {avatars=[],updateExisting=false}=await req.json();
-  const valid=avatars.filter(a=>a?.id?.startsWith("avtr_"));
+  const allValid=avatars.filter(a=>a?.id?.startsWith("avtr_"));
+  const eligible=filterExcluded(allValid,await readOptOuts());
+  const markerReview=await stageMarkerRequests(eligible);
+  const valid=markerReview.allow;
   const db=await readDb(),existing=new Map(db.avatars.filter(a=>a?.id).map(a=>[a.id,a]));
   const settings=await getSettings();
   const batch=await enrichNewAvatarsPlatforms(valid,{
@@ -40,7 +44,7 @@ export async function POST(req){
   }
 
   return Response.json({
-   added,updated,total,
+   added,updated,total,excludedOrHeld:allValid.length-valid.length,markerRequestsQueued:markerReview.queued,
    quarantined:settings.strictPlatformMode!==false?unresolved.length:0,
    verified:verified.length,
    breakdown:batch.stats

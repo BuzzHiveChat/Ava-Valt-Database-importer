@@ -16,9 +16,9 @@ async function status(){
  ]);
  let index=null;
  try{index=manifest?JSON.parse(manifest.text):null}catch(_){/* report missing index below */}
- const ready=!!workflow&&!!builder&&workflow.text===SEARCH_INDEX_WORKFLOW&&builder.text===SEARCH_INDEX_BUILDER;
+ const ready=!!workflow&&!!builder;
  return {installed:ready,workflowPresent:!!workflow,builderPresent:!!builder,
-  versionMatches:ready,indexedCount:Number.isInteger(index?.total)?index.total:null,
+  versionMatches:ready&&workflow.text===SEARCH_INDEX_WORKFLOW&&builder.text===SEARCH_INDEX_BUILDER,indexedCount:Number.isInteger(index?.total)?index.total:null,
   lastIndexedAt:index?.generatedAt||null,sourceSha:index?.sourceSha||null,
   actionsUrl:repoUrl+"/actions/workflows/ava-valt-search-index.yml"};
 }
@@ -31,7 +31,12 @@ export async function POST(req){
  if(!await ownerAuthorized())return Response.json({error:"Owner access required"},{status:403,headers:noStore});
  try{
   const body=await req.json();
-  if(body?.action!=="install"&&body?.action!=="run")return Response.json({error:"Expected action=install or run"},{status:400,headers:noStore});
+  if(!["install","run","update-builder"].includes(body?.action))return Response.json({error:"Expected action=install, run, or update-builder"},{status:400,headers:noStore});
+  if(body.action==="update-builder"){
+   const current=await getOrNull(BUILDER_PATH);
+   if(current?.text!==SEARCH_INDEX_BUILDER)await putRepoFile(BUILDER_PATH,SEARCH_INDEX_BUILDER,"Ava-Valt: update opt-out-aware search builder");
+   return Response.json({ok:true,message:"Updated the GitHub search builder. Workflow edits may require manual GitHub access; existing workflow still runs when avatar-index.json changes."},{headers:noStore});
+  }
   if(body.action==="install"){
    // Write build script FIRST; workflow is added last. Existing database and search files stay intact.
    const currentBuilder=await getOrNull(BUILDER_PATH);

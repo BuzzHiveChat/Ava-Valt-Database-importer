@@ -1,3 +1,4 @@
+import {readPlatformReview} from "../../../../lib/platformReview";
 export const dynamic="force-dynamic";
 export const revalidate=0;
 
@@ -18,6 +19,7 @@ export async function GET(){
    if(ps.some(x=>/ios|iphone|ipad/.test(x)))ios++;
   }
   const q=await quarantineStats().catch(()=>({quarantined:0}));
-  return Response.json({total:db.avatars.length,complete,unknown,pc,android,ios,quarantined:q.quarantined||0,done:unknown===0});
+  const review=await readPlatformReview().then(x=>x.avatars.length).catch(()=>null);
+  return Response.json({total:db.avatars.length,complete,unknown,pc,android,ios,quarantined:q.quarantined||0,needsReview:review,done:unknown===0});
  }catch(e){return Response.json({error:e.message},{status:500})}
 }

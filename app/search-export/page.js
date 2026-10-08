@@ -80,7 +80,8 @@ export default function SearchExport(){
    const r=await fetch("/api/db/search-autosync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action}),cache:"no-store"});
    const j=await r.json();
    if(!r.ok)throw new Error(j.error||`HTTP ${r.status}`);
-   if(mountedRef.current){setSync(j);setSyncMessage(j.message||"Updated");}
+   if(mountedRef.current){if(action!=="update-builder")setSync(j);setSyncMessage(j.message||"Updated");}
+   if(action==="update-builder")await fetchSyncStatus();
   }catch(e){if(mountedRef.current)setSyncError(e.message)}
   finally{if(mountedRef.current)setSyncBusy(false)}
  }
@@ -103,13 +104,14 @@ export default function SearchExport(){
    <p>Published search-index count: <strong>{sync?.indexedCount?.toLocaleString?.()??"—"}</strong> avatars. This count updates after GitHub Actions completes and Pages refreshes, not immediately after an import.</p>
    <div style={{display:"flex",gap:12,flexWrap:"wrap",margin:"14px 0"}}>
     <button disabled={syncBusy||autoPublishing} onClick={()=>syncAction("install")}>{syncBusy?"Working...":sync?.installed?"Repair / reinstall auto sync":"Enable automatic syncing"}</button>
+    <button disabled={syncBusy} onClick={()=>syncAction("update-builder")}>Update privacy-safe GitHub builder</button>
     <button disabled={syncBusy||!sync?.installed} onClick={()=>syncAction("run")}>Run GitHub sync now</button>
     <button disabled={syncBusy} onClick={fetchSyncStatus}>Refresh sync status</button>
    </div>
    {sync?.actionsUrl&&<p><a href={sync.actionsUrl} target="_blank" rel="noreferrer">Open GitHub Actions progress ↗</a></p>}
    {syncMessage&&<p style={{color:"#a9e5ba"}}>{syncMessage}</p>}
    {syncError&&<p style={{color:"#eb8c8c"}}>{syncError}</p>}
-   <p style={{fontSize:13,opacity:.8}}>One-time setup requires GitHub token permission to write workflow files. If GitHub returns 403, install the two supplied repository files manually. Keep your legacy database and existing Unity search URLs unchanged. Do not run the manual batch exporter while automatic syncing is enabled.</p>
+   <p style={{fontSize:13,opacity:.8}}>Privacy upgrade: click Update privacy-safe GitHub builder once, then add <code>avatar-opt-outs.json</code> to the <code>push.paths</code> list in the GitHub workflow manually (the existing token cannot edit workflows). Afterward run the workflow once in GitHub Actions. One-time setup requires GitHub token permission to write workflow files. If GitHub returns 403, install the two supplied repository files manually. Keep your legacy database and existing Unity search URLs unchanged. Do not run the manual batch exporter while automatic syncing is enabled.</p>
   </section>
   <p>This is an OWNER-ONLY opt-in publisher. It does NOT replace or delete your live avatar-index.json. It creates 256 searchable GitHub Pages JSON files for the updated VRChat world.</p>
   <p><strong>Keep your old world/database active until all 256 files are published and Unity is tested.</strong> If the importer or quarantine repair edits the live database while exporting, this tool stops; start a fresh export.</p>

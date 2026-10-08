@@ -25,7 +25,7 @@ export default function Quarantine(){
   const r=await fetch("/api/quarantine/repair",{method:"POST"});
   const j=await r.json();setBusy(false);
   if(!r.ok)return setMsg(j.error||"Automatic quarantine repair failed.");
-  setMsg(`Automatic repair finished: ${j.checked||0} checked • ${j.restored||0} restored • ${j.remaining||0} still quarantined.`);
+  setMsg(`Automatic repair finished: ${j.checked||0} checked • ${j.restored||0} restored • ${j.movedToReview||0} moved to Needs Review • ${j.remaining||0} still quarantined.`);
   await Promise.all([load(page,search),loadSettings()]);
  }
  useEffect(()=>{
@@ -101,12 +101,13 @@ export default function Quarantine(){
   <h1>Platform Quarantine</h1>
   <p className="muted">Manually check an avatar on the VRChat website, tick every platform it really supports, then add it back to the live database. This never guesses platform support.</p>
 
+  <p><a className="button secondary" href="/platform-review">OPEN PLATFORM NEEDS REVIEW →</a></p>
   {msg&&<div className="card"><b>{msg}</b></div>}
 
   <section className="card">
    <div className="eyebrow">AUTOMATIC REPAIR</div>
    <h2 style={{marginTop:6}}>Auto Quarantine Repair</h2>
-   <p className="muted">Vercel automatically retries quarantined avatars. NekoSuneVR exact-ID platform data is checked first, then KitsuneDB, avtr.zip, CuteDB and the other enabled metadata providers. The VRChat API is disabled by default and is only an optional final fallback. Verified avatars are restored to the live database; unresolved avatars stay safely quarantined.</p>
+   <p className="muted">Vercel automatically retries quarantined avatars. NekoSuneVR exact-ID platform data is checked first, then KitsuneDB, avtr.zip, CuteDB and the other enabled metadata providers. The VRChat API is disabled by default and is only an optional final fallback. Verified avatars are restored to the live database. Checked-but-unresolved avatars move to Platform Needs Review; avatars not checked yet remain quarantined.</p>
    {settings&&<>
     <label style={{display:"block",marginBottom:12}}>
      <input type="checkbox" checked={settings.autoQuarantineRepair!==false} onChange={e=>saveAuto({autoQuarantineRepair:e.target.checked})}/> Automatic quarantine repair
@@ -119,7 +120,7 @@ export default function Quarantine(){
     </div>
     <p style={{marginTop:14}}>
      Last automatic pass: <b>{settings.lastQuarantineRepair?new Date(settings.lastQuarantineRepair).toLocaleString():"Never"}</b><br/>
-     Checked: <b>{settings.lastQuarantineChecked||0}</b> • Restored: <b>{settings.lastQuarantineRestored||0}</b> • Remaining: <b>{settings.lastQuarantineRemaining??data?.total??"—"}</b>
+     Checked: <b>{settings.lastQuarantineChecked||0}</b> • Restored: <b>{settings.lastQuarantineRestored||0}</b> • Moved to Review: <b>{settings.lastQuarantineMovedToReview||0}</b> • Remaining: <b>{settings.lastQuarantineRemaining??data?.total??"—"}</b>
     </p>
     {settings.lastQuarantineError&&<p className="error">{settings.lastQuarantineError}</p>}
    </>}
