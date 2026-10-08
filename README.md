@@ -26,3 +26,7 @@ If your Vercel plan supports more frequent Cron Jobs, you can change the schedul
 ## Safety
 Do not put secrets in source code. Do not commit `.env.local`.
 Providers that explicitly block this service should remain disabled/skipped rather than bypassed.
+
+## Discord bot notification integration
+
+The website now calls the Ava-Valt v2.12.0 bot after successful manual or automatic imports. See [WEBSITE_DISCORD_INTEGRATION.md](WEBSITE_DISCORD_INTEGRATION.md) for the deployment steps, WispByte HTTPS requirement, Vercel environment variables, fallback behavior, and testing.

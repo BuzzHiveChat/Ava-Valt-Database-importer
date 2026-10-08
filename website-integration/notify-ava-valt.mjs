@@ -1,6 +1,6 @@
 /**
  * Website importer → Ava-Valt Discord bot, server-side only.
- * Call AFTER the completed avatar-index.json has been committed to GitHub.
+ * Call AFTER avatar-index.json is successfully committed to GitHub.
  * Never import this helper into browser/client components.
  */
 export async function notifyAvaValtImportComplete(runId) {
@@ -15,7 +15,9 @@ export async function notifyAvaValtImportComplete(runId) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
     body: JSON.stringify({ event: 'import.completed', runId }),
-    signal: AbortSignal.timeout(10000),
+    // Avoid adding a long delay to a Vercel function that may already be
+    // close to its maxDuration limit. GitHub polling is the safe fallback.
+    signal: AbortSignal.timeout(3500),
     cache: 'no-store'
   });
   if (!response.ok) throw new Error(`Ava-Valt bot webhook returned HTTP ${response.status}`);

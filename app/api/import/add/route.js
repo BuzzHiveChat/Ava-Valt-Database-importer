@@ -5,6 +5,7 @@ import {enrichNewAvatarsPlatforms} from "../../../../lib/enrich";
 import {quarantineRecords} from "../../../../lib/platformQuarantine";
 import {hasKnownPlatform} from "../../../../lib/platforms";
 import {readOptOuts,filterExcluded,stageMarkerRequests} from "../../../../lib/optOut";
+import {reportCommittedImport} from "../../../../website-integration/report-import.mjs";
 export const maxDuration=60;
 
 export async function POST(req){
@@ -42,6 +43,10 @@ export async function POST(req){
    const r=await replaceAndSave([...map.values()],`Ava-Valt manual importer: update ${updated} avatar(s)`);
    total=r.total;
   }
+
+  // Notify only after successful GitHub writes. Discord is an optional
+  // downstream consumer: a webhook failure never fails this import.
+  if (added > 0 || updated > 0) await reportCommittedImport('manual');
 
   return Response.json({
    added,updated,total,excludedOrHeld:allValid.length-valid.length,markerRequestsQueued:markerReview.queued,
