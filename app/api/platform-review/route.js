@@ -1,5 +1,6 @@
 import {ownerAuthorized} from "../../../lib/guard";
 import {listPlatformReview,ownerVerifyReviewedAvatar,ownerDismissReviewedAvatar} from "../../../lib/platformReview";
+import {runPlatformAutoReview,resumePlatformAutoReview} from "../../../lib/platformAutoReview";
 export const dynamic="force-dynamic";
 export const revalidate=0;
 export const maxDuration=60;
@@ -22,6 +23,8 @@ export async function POST(req){
   const b=await req.json();
   if(b?.action==="verify")return Response.json(await ownerVerifyReviewedAvatar(b.id,b.platforms));
   if(b?.action==="dismiss")return Response.json(await ownerDismissReviewedAvatar(b.id));
+  if(b?.action==="auto-run")return Response.json(await runPlatformAutoReview());
+  if(b?.action==="auto-resume")return Response.json(await resumePlatformAutoReview());
   return Response.json({error:"Unsupported action"},{status:400});
  }catch(e){return Response.json({error:e.message},{status:400})}
 }

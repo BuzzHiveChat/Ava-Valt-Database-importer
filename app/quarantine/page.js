@@ -53,15 +53,15 @@ export default function Quarantine(){
  }
 
  async function testKitsune(a){
-  setBusy(true);setMsg(`Checking KitsuneDB's public website for ${a.id}...`);
+  setBusy(true);setMsg(`Checking KitsuneDB's VRCX API for ${a.id}...`);
   const r=await fetch("/api/providers/kitsune-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:a.id,name:a.name||""})});
   const j=await r.json();setBusy(false);
   if(!r.ok)return setMsg(j.error||"KitsuneDB test failed.");
   if(j.platforms?.length){
    setDraft({...draft,[a.id]:j.platforms});
-   setMsg(`KitsuneDB Website found: ${j.platforms.join(" + ")}. I ticked those platform boxes for you — review them, then VERIFY & ADD.`);
+   setMsg(`KitsuneDB API found: ${j.platforms.join(" + ")}. I ticked those platform boxes for you — review them, then VERIFY & ADD.`);
   }else{
-   setMsg(`KitsuneDB Website returned no safe platform evidence for this avatar. ${j.attempts?.length||0} public page route(s) were tried.`);
+   setMsg(`${j.reason||"KitsuneDB API returned no platform metadata. Open KitsuneDB and manually confirm the avatar badge."}`);
   }
  }
 

@@ -30,3 +30,18 @@ Providers that explicitly block this service should remain disabled/skipped rath
 ## Discord bot notification integration
 
 The website now calls the Ava-Valt v2.12.0 bot after successful manual or automatic imports. See [WEBSITE_DISCORD_INTEGRATION.md](WEBSITE_DISCORD_INTEGRATION.md) for the deployment steps, WispByte HTTPS requirement, Vercel environment variables, fallback behavior, and testing.
+
+## Automatic Platform Needs Review (5/hour, non-VRChat)
+
+See [PLATFORM_AUTO_REVIEW.md](PLATFORM_AUTO_REVIEW.md). This opt-in worker
+collects low-rate third-party metadata suggestions for owner review; it never
+scrapes VRChat or publishes avatar platform changes without confirmation.
+
+## KitsuneDB platform evidence / IMPORT
+
+KitsuneDB (`https://avtr.fumikoecho.net/avatars`) is **already included**
+as the `KitsuneDB` import provider; leave its existing checkbox enabled.
+The exact-ID API resolver now understands PC + Quest -> PC + Android and
+provider boolean platform maps. The manual Needs Review page links to the
+KitsuneDB website for cases when its public VRCX response lacks platform fields.
+See `KITSUNEDB_INTEGRATION_FIX.md` for limitations and instructions.

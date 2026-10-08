@@ -8,6 +8,6 @@ export async function POST(req){
   const {id,name=""}=await req.json();
   if(!String(id||"").startsWith("avtr_"))return Response.json({error:"Enter an avtr_ ID"},{status:400});
   const result=await kitsuneWebsitePlatformLookup({id,name});
-  return Response.json({ok:true,...result});
+  return Response.json({ok:true,...result},{headers:{"Cache-Control":"no-store"}});
  }catch(e){return Response.json({error:e.message},{status:500})}
 }
