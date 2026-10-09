@@ -28,9 +28,11 @@ export default function QuickImport(){
    const avatars=selected.map(a=>({id:a.id,name:a.name.trim(),author:a.author.trim()||"Unknown",authorId:a.avatar?.authorId||"",description:a.avatar?.description||"",imageUrl:a.avatar?.imageUrl||"",thumbnailImageUrl:a.avatar?.thumbnailImageUrl||"",platforms:a.platforms}));
    const r=await fetch("/api/quick-import/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({avatars})});
    if(r.status===401){location.href="/login";return;}
-   const data=await r.json();if(!r.ok)throw Error(data.error||"Save failed");
-   if(data.added===selected.length)setItems(old=>old.map(a=>selected.some(s=>s.id===a.id)?{...a,existing:true,selected:false}:a));
-   setMessage(`Saved ${data.added} avatar(s). ${data.duplicates} already present; ${data.excludedOrHeld} excluded/held by creator privacy rules.`);
+   const data=await r.json();if(!r.ok)throw Error(data.error||(`Save verification failed: ${JSON.stringify(data.missingIds||[])}. Check GitHub database and server logs.`));
+   const saved=new Set(data.verifiedIds||[]);
+   if(saved.size)setItems(old=>old.map(a=>saved.has(a.id)?{...a,existing:true,selected:false}:a));
+   const destination=`${data.destination||"GitHub database"} / ${data.branch||"main"} / ${data.path||"avatar-index.json"}`;
+   setMessage(`${data.added} newly added; ${saved.size} confirmed present in GitHub. ${data.duplicates} already present; ${data.excludedOrHeld} excluded/held for creator privacy review.${data.missingIds?.length?` WARNING: ${data.missingIds.length} not verified: ${data.missingIds.join(", ")}.`:""} Destination: ${destination}.`);
   }catch(e){setMessage(e.message)}finally{setBusy(false)}
  }
  return <main style={{maxWidth:1100,margin:"30px auto",padding:"0 18px"}}>
