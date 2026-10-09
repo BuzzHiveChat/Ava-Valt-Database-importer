@@ -29,21 +29,34 @@ export async function POST(req){
   const markerReview=await stageMarkerRequests(eligible);
   const allowed=markerReview.allow;
   const result=allowed.length?await mergeAndSave(allowed,`Ava-Valt Quick Import: +${allowed.length} manually reviewed avatar(s)`):{added:0};
-  // Read the actual GitHub file back. A successful request is not proof the
-  // requested records ended up in avatar-index.json.
-  const verified=await readDb();
-  const persisted=new Set(verified.avatars.filter(a=>a?.id).map(a=>String(a.id).toLowerCase()));
-  const addedIds=allowed.filter(a=>persisted.has(a.id)).map(a=>a.id);
-  const missingIds=allowed.filter(a=>!persisted.has(a.id)).map(a=>a.id);
+  // GitHub's successful PUT response is authoritative for the committed IDs.
+  // A subsequent raw-file/contents read can temporarily return stale data.
+  const committedIds=(result.committedIds||[]).map(id=>String(id).toLowerCase());
+  const committedSet=new Set(committedIds);
+  let readback=null;
+  let verificationWarning=null;
+  try { readback=await readDb(); }
+  catch(e){verificationWarning=`Post-save read unavailable: ${e.message}`;}
+  const persisted=new Set((readback?.avatars||[]).filter(a=>a?.id).map(a=>String(a.id).toLowerCase()));
+  const readbackVerifiedIds=allowed.filter(a=>persisted.has(a.id)).map(a=>a.id);
   const existingIds=clean.filter(a=>existing.has(a.id)).map(a=>a.id);
   const heldIds=newOnly.filter(a=>!allowed.some(x=>x.id===a.id)).map(a=>a.id);
+  // An ID is confirmed by either the successful GitHub commit or a fresh read.
+  // Never claim success for IDs missing from both.
+  const confirmedIds=allowed.filter(a=>committedSet.has(a.id)||persisted.has(a.id)).map(a=>a.id);
+  const missingIds=allowed.filter(a=>!committedSet.has(a.id)&&!persisted.has(a.id)).map(a=>a.id);
+  if(committedIds.length&&readbackVerifiedIds.length<committedIds.length){
+   verificationWarning=verificationWarning||"GitHub accepted the commit, but the immediate database read has not caught up yet.";
+  }
   if(result.added>0)await reportCommittedImport("manual").catch(e=>console.warn("Import notification failed:",e.message));
   return Response.json({
-   added:result.added, verifiedIds:addedIds, missingIds, existingIds, heldIds,
-   duplicates:existingIds.length,excludedOrHeld:heldIds.length,total:verified.avatars.length,
+   added:result.added, verifiedIds:confirmedIds, readbackVerifiedIds, committedIds, commitSha:result.commitSha||null,
+   missingIds, existingIds, heldIds, verificationWarning,
+   duplicates:existingIds.length,excludedOrHeld:heldIds.length,total:readback?.avatars?.length??result.total??0,
    destination:`${process.env.GITHUB_OWNER||"BuzzHiveChat"}/${process.env.GITHUB_REPO||"Ava-Valt-Database"}`,
    branch:process.env.GITHUB_BRANCH||"main",path:process.env.GITHUB_DATABASE_PATH||"avatar-index.json",
-   verified:missingIds.length===0
+   verified:missingIds.length===0 && !verificationWarning,
+   commitConfirmed:committedIds.length>0
   },{status:missingIds.length?502:200});
  }catch(e){console.error("[quick-import/save] GitHub save failed:",e);return Response.json({error:e?.message||"Unexpected server failure",stage:"GitHub save or verification"},{status:500});}
 }
