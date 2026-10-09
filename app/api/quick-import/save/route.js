@@ -3,7 +3,7 @@ import {readDb,mergeAndSave} from "../../../../lib/db";
 import {readOptOuts,filterExcluded,stageMarkerRequests} from "../../../../lib/optOut";
 import {reportCommittedImport} from "../../../../website-integration/report-import.mjs";
 
-const ID=/^avtr_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ID=/^avtr_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PLATFORMS=["PC","Android","iOS"];
 export const maxDuration=60;
 export async function POST(req){
