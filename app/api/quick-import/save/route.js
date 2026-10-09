@@ -23,7 +23,7 @@ export async function POST(req){
    seen.add(id);
    clean.push({id,name,author:String(entry.author||"Unknown").slice(0,160),authorId:String(entry.authorId||"").slice(0,100),description:String(entry.description||"").slice(0,2000),imageUrl:String(entry.imageUrl||"").slice(0,1024),thumbnailImageUrl:String(entry.thumbnailImageUrl||"").slice(0,1024),releaseStatus:"public",searchable:true,platforms:[...new Set(platforms)],performancePc:"",performanceAndroid:"",performanceIos:"",tags:"",createdAt:"",updatedAt:"",version:0,metadataProvider:"Quick Import (manual platform)"});
   }
-  const existing=new Set((await readDb()).avatars.map(a=>a?.id?.toLowerCase()));
+  const existing=new Set((await readDb()).avatars.filter(a=>a?.id).map(a=>a.id.toLowerCase()));
   const newOnly=clean.filter(a=>!existing.has(a.id));
   const eligible=filterExcluded(newOnly,await readOptOuts());
   const markerReview=await stageMarkerRequests(eligible);
@@ -45,5 +45,5 @@ export async function POST(req){
    branch:process.env.GITHUB_BRANCH||"main",path:process.env.GITHUB_DATABASE_PATH||"avatar-index.json",
    verified:missingIds.length===0
   },{status:missingIds.length?502:200});
- }catch(e){return Response.json({error:e.message},{status:500});}
+ }catch(e){console.error("[quick-import/save] GitHub save failed:",e);return Response.json({error:e?.message||"Unexpected server failure",stage:"GitHub save or verification"},{status:500});}
 }
