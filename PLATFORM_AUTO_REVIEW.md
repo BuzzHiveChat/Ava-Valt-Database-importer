@@ -5,7 +5,7 @@ restrict unauthorised automated access and scraping; slowing requests to five
 per hour does **not** make prohibited requests permitted. The worker makes **no**
 automated HTTP requests to vrchat.com or api.vrchat.cloud and never handles VRChat
 credentials. It checks the independent **NekoSuneVR exact-avatar-ID** metadata provider,
-then KitsuneDB’s publicly advertised VRCX integration when the first has no
+then AviSeek’s documented public avatar catalog API when the first has no
 platform evidence (each provider’s own terms must be respected), saves
 candidate platform evidence, and requires the owner to confirm each avatar
 before publishing it. It does not bypass 401, 403 or 429 responses.
@@ -31,8 +31,8 @@ before publishing it. It does not bypass 401, 403 or 429 responses.
 
 - Maximum 5 avatars *reserved* per rolling 60 minutes, including manual triggers.
 - At most one avatar at a time (no concurrency or VRChat traffic). A single
-  automatic avatar check may require one NekoSuneVR request and one KitsuneDB API request (up to 3 seconds).
-  Manual KitsuneDB lookups may try two supported API query modes.
+  automatic avatar check may require one NekoSuneVR request and one AviSeek API request (up to 3 seconds).
+  Manual AviSeek lookups use one exact-ID search and never trust fuzzy matches.
   A 401/403/429 response stops further providers for that avatar and pauses the worker.
 - At most one pass per avatar every 24 hours (configurable upward).
 - Provider results are only *suggestions*; a human must visit the VRChat page

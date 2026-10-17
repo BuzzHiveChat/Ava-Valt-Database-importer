@@ -37,22 +37,33 @@ See [PLATFORM_AUTO_REVIEW.md](PLATFORM_AUTO_REVIEW.md). This opt-in worker
 collects low-rate third-party metadata suggestions for owner review; it never
 scrapes VRChat or publishes avatar platform changes without confirmation.
 
-## KitsuneDB platform evidence / IMPORT
+## Avatar sites and supported platforms
 
-KitsuneDB (`https://avtr.fumikoecho.net/avatars`) is available as
-`KitsuneDB` under **IMPORT providers** on the main Admin page. Use
-**KITSUNEDB ONLY** to test it independently, or **SELECT ALL ENABLED** to
-search every provider allowed in Auto Import Settings. Each result shows the
-provider that supplied its platform evidence. Only enabled providers are
-queried in manual searches; changes to this search selection do not alter
-automatic import settings. The import response lists per-provider HTTP health.
-Duplicate-avatar results now retain valid platform evidence if the first
-provider returned none, and an empty provider list never triggers a search
-of all providers by accident.
-The exact-ID API resolver now understands PC + Quest -> PC + Android and
-provider boolean platform maps. The manual Needs Review page links to the
-KitsuneDB website for cases when its public VRCX response lacks platform fields.
-See `KITSUNEDB_INTEGRATION_FIX.md` for limitations and instructions.
+The retired search services have been removed from all active provider lists,
+API routes, platform-repair lookups, and stored settings. An earlier saved
+`auto-import-settings.json` is filtered at read/write time; the removed
+providers cannot be re-enabled by stale settings. Existing GitHub avatar records
+are **not** deleted or rewritten merely because they originally came from an
+older provider.
+
+**AviSeek** is a new enabled-by-default import provider using its official,
+keyless catalog API: `GET /api/world/search?q=fox&limit=120`.
+Exact-ID lookups use the documented `GET /api/world/avatars?ids=avtr_...` route,
+which does not count a page view. The adapter handles `avatars` JSON records, reports provider errors, caches
+successful searches for at least 60 seconds, and maps explicit `PC`, `Quest`
+(`Android`) and `iOS` metadata without inferring missing builds. The importer
+credits [AviSeek / VRChat Legends](https://aviseek.vrchatlegends.com/).
+Its public API rules: https://aviseek.vrchatlegends.com/docs/.
+
+**VRCNDb** (https://db.vrcnext.com/) supports visible PC / Quest / iOS
+filters; it is linked from the importer and Needs Review page for manual
+checking. Its API format was not verified, so it has *not* been wired to
+unverified automatic URLs. **NekoSuneVR** remains available for search and
+exact-ID checks. There are no changes to the GitHub write-back workflow.
+
+To test a single source, choose **AVISEEK ONLY** in the import panel. On the
+Needs Review page, choose **LOOK UP AVISEEK** for a single exact `avtr_` ID
+before manually confirming the suggested platforms.
 
 ## Website versus Unity
 The Unity client and a serverless Vercel function do not share an IP address,
