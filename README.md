@@ -1,3 +1,5 @@
+> **18 October 2026:** Fixes for 120-result cap, provider mixing, PAW/AviSeek platform previews, and cramped avatar cards. See [AVATAR_RESULTS_FIX_OCT_2026.md](AVATAR_RESULTS_FIX_OCT_2026.md).
+
 # Ava-Valt Web Admin V2
 
 ## What changed

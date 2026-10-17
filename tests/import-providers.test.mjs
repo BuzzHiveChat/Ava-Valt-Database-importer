@@ -103,3 +103,51 @@ test('existing saved settings drop retired providers and enable the replacement'
   assert.equal(r.lastHealth.some(x=>/KitsuneDB/i.test(x.provider)),false);
  }finally{globalThis.fetch=old;if(token===undefined)delete process.env.GITHUB_TOKEN;else process.env.GITHUB_TOKEN=token;}
 });
+
+test('search keeps provider diversity, unions evidence and reports actual unique total beyond displayed cap',async()=>{
+ const old=globalThis.fetch;
+ try{
+  const a=Array.from({length:6},(_,i)=>({id:`avtr_00000000-0000-0000-0000-${String(i+100).padStart(12,'0')}`,name:`PAW ${i}`,platform:i===0?'pc':null}));
+  const b=Array.from({length:6},(_,i)=>({id:i===0?a[0].id:`avtr_00000000-0000-0000-0000-${String(i+200).padStart(12,'0')}`,name:`VRCWB ${i}`,platform:i===0?'android':null}));
+  globalThis.fetch=async url=>json(String(url).includes('paw-api')?a:b);
+  const r=await searchProviders({query:'fox',mode:'search',providers:['PAW','VRCWB'],limit:7});
+  assert.equal(r.totalUnique,11);assert.equal(r.shown,7);assert.equal(r.truncated,true);
+  assert.deepEqual(r.avatars[0].platforms,['PC','Android']);
+  assert.deepEqual(r.avatars[0].sourceProviders,['PAW','VRCWB']);
+  assert.equal(r.avatars[1].sourceProviders[0],'PAW');
+  assert.equal(r.avatars[2].sourceProviders[0],'VRCWB');
+ }finally{globalThis.fetch=old}
+});
+
+test('AviSeek loads a documented nextOffset page when 1000 results are requested',async()=>{
+ const hits=[];
+ const r=await searchAviSeek('fox',{limit:700,fetchImpl:async url=>{
+  const u=new URL(url),offset=Number(u.searchParams.get('offset')||0);
+  hits.push({offset,limit:Number(u.searchParams.get('limit'))});
+  const size=offset===0?500:200;
+  return json({avatars:Array.from({length:size},(_,i)=>({id:`avtr_00000000-0000-0000-0000-${String(offset+i).padStart(12,'0')}`,name:'Fox',platforms:['pc']})),nextOffset:offset+size});
+ }});
+ assert.equal(r.avatars.length,700);
+ assert.deepEqual(hits,[{offset:0,limit:500},{offset:500,limit:200}]);
+});
+
+test('AviSeek latest and random use catalog routes rather than searching the word avatar',async()=>{
+ for(const [mode,endpoint] of [['latest','/api/world/list'],['random','/api/world/random']]){
+  const urls=[];
+  await searchAviSeek('',{mode,limit:20,fetchImpl:async url=>{urls.push(String(url));return json({avatars:[]})}});
+  assert.match(urls[0],new RegExp(endpoint));assert.equal(urls[0].includes('q=avatar'),false);
+ }
+});
+
+test('AviSeek exact avatar ID queries request ID not fuzzy search',async()=>{
+ const urls=[];
+ const r=await searchAviSeek(ID,{fetchImpl:async url=>{urls.push(String(url));return json({avatars:[{id:ID,platforms:['quest']}]})}});
+ assert.match(urls[0],/\/api\/world\/avatars\?ids=avtr_/);
+ assert.deepEqual(r.avatars[0].platforms,['Android']);
+});
+
+test('PAW data with a reported platform is shown, but missing fields are not guessed',()=>{
+ assert.deepEqual(platformSetFromAny({platform:'ios'}),['iOS']);
+ assert.deepEqual(platformSetFromAny({platform:'quest'}),['Android']);
+ assert.deepEqual(platformSetFromAny({platform:null}),[]);
+});
