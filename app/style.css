@@ -29,3 +29,22 @@
 /* Manual verification can cover every selected avatar; requests remain safely batched. */
 .platformCheckProgress{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;color:#d8c7f0;font-size:13px}
 .platformCheckProgress progress{appearance:auto;flex:1 1 220px;max-width:450px;height:14px;accent-color:#9f70eb}
+
+/* Smart search: clearer primary action and a calm safety workflow. */
+.searchCard{border-color:#574071;background:linear-gradient(165deg,#20162f,#171322 75%)}
+.searchCardHeading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.searchCardHeading h2{margin:4px 0 8px;font-size:20px}.searchCardHeading p{margin:0 0 16px;max-width:670px;line-height:1.55}
+.searchSafety{border:1px solid #4e735e;background:#20382b;color:#a8efbd;padding:6px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.searchControls{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin:12px 0 16px}
+.searchControls input{flex:2 1 240px;min-width:180px}
+.searchControls select{flex:0 1 155px;min-width:125px}
+.runSearchBtn{background:linear-gradient(115deg,#a05de7,#7c50d8);border:1px solid #b891f5;box-shadow:0 5px 15px #12082177;padding:12px 20px;letter-spacing:.025em;min-height:46px}
+.runSearchBtn:not(:disabled):hover{filter:brightness(1.12);transform:translateY(-1px)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #d3baff;outline-offset:2px}
+.searchOptions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:10px;margin:12px 0}
+.searchToggle{display:flex;align-items:flex-start;gap:12px;border:1px solid #4b3865;background:#1b1528;border-radius:12px;padding:12px;cursor:pointer}
+.searchToggle input[type=checkbox]{flex:0 0 19px;min-width:19px;width:19px;height:19px;margin:1px 0 0;accent-color:#a377ed}
+.searchToggle strong,.searchToggle small{display:block}.searchToggle strong{font-size:13px}.searchToggle small{font-size:12px;color:#b6a5cc;line-height:1.4;margin-top:5px}
+.searchCounts{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#281c37;border-radius:12px;padding:10px 14px;margin:12px 0;font-size:13px}
+.searchCounts button{padding:8px 11px;font-size:12px}.searchStatus{font-size:13px;line-height:1.6;color:#d9c8f1;white-space:pre-wrap;margin:13px 0}
+@media(max-width:650px){.searchControls>*{flex:1 1 100%!important}.searchCardHeading h2{font-size:18px}}

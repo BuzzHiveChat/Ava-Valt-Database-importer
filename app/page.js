@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {runSelectedPlatformChecks} from "../lib/manualPlatformChecks.mjs";
+import {reportedPlatforms,platformReviewCounts,pendingPlatformChecks,applyPlatformCheckResults,filterAvatarCards} from "../lib/searchPlatformReview.mjs";
 export default function Home(){
   const [autoState,setAutoState]=useState(null); const [me,setMe]=useState(null);
   async function loadAutoState(){
@@ -24,64 +25,74 @@ export default function Home(){
  const [stats,setStats]=useState(null),[q,setQ]=useState(""),[platformFilter,setPlatformFilter]=useState("All"),[mode,setMode]=useState("latest"),[results,setResults]=useState([]),[selected,setSelected]=useState({}),[status,setStatus]=useState("Ready.");
  const [resultLimit,setResultLimit]=useState(500),[pageIndex,setPageIndex]=useState(0),[searchSummary,setSearchSummary]=useState(null),[sourceFilter,setSourceFilter]=useState("All");
  const [checkingPlatforms,setCheckingPlatforms]=useState(false),[checkProgress,setCheckProgress]=useState(null);
+ const [searching,setSearching]=useState(false),[verifiedOnly,setVerifiedOnly]=useState(true),[autoVerifyMissing,setAutoVerifyMissing]=useState(true);
  const [safeVerifyConfig,setSafeVerifyConfig]=useState(null);
  useEffect(()=>{fetch("/api/import/verify",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(setSafeVerifyConfig).catch(()=>{})},[]);
- const stopPlatformChecks=useRef(false),platformChecksRunning=useRef(false);
+ const stopPlatformChecks=useRef(false),platformChecksRunning=useRef(false),searchRunning=useRef(false);
  const load=async()=>{const r=await fetch("/api/db"); if(r.status===401){location="/login";return} const j=await r.json();setStats(j)};
  useEffect(()=>{load()},[]);
- async function search(){
-   if(platformChecksRunning.current)return;
-   if(!selectedProviders.length){setStatus("Select at least one enabled IMPORT provider first.");return;}
-   setStatus(`Searching ${selectedProviders.join(", ")}...`);
-   try{
-    const r=await fetch("/api/import/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,mode,limit:resultLimit,platform:platformFilter,providers:selectedProviders})});
-    const j=await r.json();
-    if(!r.ok){setStatus(j.error||`Search failed (HTTP ${r.status})`);return;}
-    setResults(j.avatars||[]);setSelected({});setPageIndex(0);setCheckProgress(null);setSearchSummary(j);
-    setStatus(`${j.avatars.length} shown${j.totalUnique>j.avatars.length?` of ${j.totalUnique} unique matches`:""} • ${(j.notes||[]).join(" • ")}`);
-   }catch(e){setStatus(`Provider search failed: ${e.message}`);}
-  }
- function platformLabels(a){const raw=Array.isArray(a?.platforms)?a.platforms:String(a?.platforms||"").split(/[•,]/);const out=[];for(const v of raw){const p=String(v).toLowerCase();if((p==="pc"||p.includes("windows"))&&!out.includes("PC"))out.push("PC");else if((p.includes("android")||p.includes("quest"))&&!out.includes("Android"))out.push("Android");else if(p.includes("ios")&&!out.includes("iOS"))out.push("iOS")}return out}
- const selectedUnknown=results.filter(a=>selected[a.id]&&!platformLabels(a).length&&!a.safePlatformCheckCompleted);
- const allUnknown=results.filter(a=>!platformLabels(a).length&&!a.safePlatformCheckCompleted);
- async function verifySelected(){
+ function platformLabels(a){return reportedPlatforms(a)}
+ const selectedUnknown=pendingPlatformChecks(results.filter(a=>selected[a.id]),results.length||1);
+ const allUnknown=pendingPlatformChecks(results,results.length||1);
+ const counts=platformReviewCounts(results);
+ const safeChecksReady=Boolean(safeVerifyConfig?.enabled&&me?.isOwner);
+ const safeChecksReason=!me?.isOwner?"Only the owner may run extra lookups.":safeVerifyConfig?.reason||"Enable SAFE_PLATFORM_VERIFY_ENABLED and shared Redis on Vercel to turn on cautious platform lookups.";
+
+ async function checkPlatforms(avatars,{automatic=false}={}){
   if(platformChecksRunning.current)return;
-  if(!safeVerifyConfig?.enabled||!me?.isOwner){setStatus("Bulk platform checking is disabled for safety. Only the owner can enable it using a shared rate limiter.");return;}
-  const avatars=selectedUnknown.slice(0,safeVerifyConfig.maxSelection);
-  if(!avatars.length){setStatus("Select avatars with unchecked platforms first, or use SELECT ALL UNKNOWN.");return;}
+  if(!safeChecksReady){setStatus(`Platform lookups have not started. ${safeChecksReason}`);return;}
+  const max=safeVerifyConfig.maxSelection||50;
+  const candidates=pendingPlatformChecks(avatars,max);
+  if(!candidates.length){if(!automatic)setStatus("No unchecked avatars selected. Select unknown avatars first.");return;}
   platformChecksRunning.current=true;
   stopPlatformChecks.current=false;
   setCheckingPlatforms(true);
-  setCheckProgress({processed:0,total:avatars.length,attempted:0,resolved:0,unresolved:0,deferred:0,batchesFinished:0,batchCount:Math.ceil(avatars.length/10)});
-  setStatus(`Safe AviSeek-only check: ${avatars.length} avatars, at most 10 per batch, 30 seconds apart. ${selectedUnknown.length>avatars.length?`${selectedUnknown.length-avatars.length} extra selection(s) will wait for a later run.`:""}`);
+  setCheckProgress({processed:0,total:candidates.length,attempted:0,resolved:0,unresolved:0,deferred:0,batchesFinished:0,batchCount:Math.ceil(candidates.length/10)});
+  setStatus(`${automatic?"Search complete. Auto-checking":"Checking"} ${candidates.length} unknown avatars safely with AviSeek, 10 IDs per request and ${Math.round(safeVerifyConfig.intervalMs/1000)}s between batches. Use STOP CHECKING to cancel.`);
   try{
    const done=await runSelectedPlatformChecks({
-    avatars,
-    delayMs:safeVerifyConfig.intervalMs,
+    avatars:candidates,delayMs:safeVerifyConfig.intervalMs,
     shouldStop:()=>stopPlatformChecks.current,
     requestBatch:async batch=>{
-     const r=await fetch("/api/import/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({avatars:batch})});
-     const j=await r.json();
-     if(!r.ok)throw new Error(j.error||`Platform lookup failed (HTTP ${r.status}).`);
-     return j;
+      const r=await fetch("/api/import/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({avatars:batch})});
+      const j=await r.json();
+      if(!r.ok)throw new Error(j.error||`Platform lookup failed (HTTP ${r.status})`);
+      return j;
     },
     onBatch:(response,progress)=>{
-     const updates=new Map(response.avatars.map(a=>[a.id,a]));
-     setResults(old=>old.map(a=>updates.has(a.id)?{...a,...updates.get(a.id),safePlatformCheckCompleted:true,sourceProviders:a.sourceProviders}:a));
-     setCheckProgress(progress);
-     setStatus(`Checking selected platforms: ${progress.processed}/${progress.total} processed • ${progress.attempted} attempted • ${progress.resolved} resolved • ${progress.unresolved} still unknown • ${progress.deferred} deferred (${progress.batchesFinished}/${progress.batchCount} batches).`);
+      setResults(old=>applyPlatformCheckResults(old,response.avatars));
+      setCheckProgress(progress);
+      setStatus(`Checking platforms: ${progress.processed}/${progress.total} checked • ${progress.resolved} confirmed • ${progress.unresolved} unconfirmed. No missing platforms are guessed.`);
     }
    });
    setCheckProgress(done);
-   const report=`${done.processed}/${done.total} processed • ${done.attempted} attempted • ${done.resolved} resolved • ${done.unresolved} still unknown • ${done.deferred} deferred`;
-   if(done.error)setStatus(`Platform checks paused: ${report}. ${done.error} You can retry remaining avatars after the problem is fixed.`);
-   else if(done.stopped)setStatus(`Platform checks stopped: ${report}. No additional batches will start.`);
-   else setStatus(`Platform checks finished: ${report}. Unknown platforms are not guessed; deferred lookups can be retried.`);
-  }finally{
-   platformChecksRunning.current=false;
-   stopPlatformChecks.current=false;
-   setCheckingPlatforms(false);
-  }
+   if(done.error)setStatus(`Platform checks paused after ${done.processed}/${done.total}: ${done.error}. Existing search results are still available.`);
+   else if(done.stopped)setStatus(`Stopped platform checks after ${done.processed}/${done.total}. Your confirmed results have been kept.`);
+   else setStatus(`Finished ${done.processed} platform checks: ${done.resolved} with confirmed platforms and ${done.unresolved} still without evidence. ${Math.max(0,pendingPlatformChecks(avatars,avatars.length).length-candidates.length)} more may be checked later.`);
+  }catch(e){setStatus(`Platform checks paused safely: ${e.message}`);}
+  finally{platformChecksRunning.current=false;stopPlatformChecks.current=false;setCheckingPlatforms(false);}
+ }
+ async function verifySelected(){await checkPlatforms(selectedUnknown);}
+
+ async function search(){
+   if(searchRunning.current||platformChecksRunning.current)return;
+   if(!selectedProviders.length){setStatus("Select at least one enabled IMPORT provider first.");return;}
+   searchRunning.current=true;setSearching(true);setCheckProgress(null);
+   setStatus(`Searching ${selectedProviders.join(", ")} for avatars and platform evidence…`);
+   try{
+    const r=await fetch("/api/import/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q,mode,limit:resultLimit,platform:platformFilter,providers:selectedProviders})});
+    const j=await r.json();
+    if(!r.ok){setStatus(`${j.error||`Search failed (HTTP ${r.status})`}${j.retryAfter?` Try again in ${j.retryAfter}s.`:""}`);return;}
+    const found=j.avatars||[];
+    const snapshot=platformReviewCounts(found);
+    setResults(found);setSelected({});setPageIndex(0);setSearchSummary(j);
+    const summary=`Found ${found.length} avatars • ${snapshot.verified} confirmed platforms • ${snapshot.unknown} missing platform data.`;
+    if(!snapshot.unknown){setStatus(`${summary} All loaded results have platform evidence.`);return;}
+    if(!autoVerifyMissing){setStatus(`${summary} Automatic follow-up checks are off. You can enable them above.`);return;}
+    if(!safeChecksReady){setStatus(`${summary} Only confirmed platforms are shown by default. Automatic follow-up checks are unavailable until the owner's shared API limiter is configured. You can still show unconfirmed avatars.`);return;}
+    await checkPlatforms(found,{automatic:true});
+   }catch(e){setStatus(`Provider search failed: ${e.message}`);}
+   finally{searchRunning.current=false;setSearching(false);}
  }
  async function add(){if(platformChecksRunning.current){setStatus("Wait for platform checking to finish before adding avatars.");return;}const avatars=results.filter(a=>selected[a.id]);if(!avatars.length)return setStatus("Select at least one avatar.");setStatus("Checking platforms and updating GitHub...");const r=await fetch("/api/import/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({avatars})});const j=await r.json();setStatus(r.ok?`Added ${j.added}; updated ${j.updated}; ${j.excludedOrHeld||0} excluded/held for privacy; ${j.quarantined||0} unresolved moved to quarantine; database now ${j.total}.`:j.error);if(r.ok)load()}
  async function autoImport(){
@@ -101,7 +112,7 @@ export default function Home(){
   }
   async function remove(){const id=prompt("Avatar ID to remove (avtr_...)");if(!id)return;const r=await fetch("/api/db/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});const j=await r.json();setStatus(r.ok?`Removed ${id}. Database now ${j.total}.`:j.error);if(r.ok)load()}
  const PAGE_SIZE=36;
- const visibleResults=results.filter(a=>(platformFilter==="All"||platformLabels(a).includes(platformFilter))&&(sourceFilter==="All"||(a.sourceProviders||[a.metadataProvider]).includes(sourceFilter)));
+ const visibleResults=filterAvatarCards(results,{platform:platformFilter,source:sourceFilter,verifiedOnly});
  const pageCount=Math.max(1,Math.ceil(visibleResults.length/PAGE_SIZE));
  const safePage=Math.min(pageIndex,pageCount-1);
  const pageResults=visibleResults.slice(safePage*PAGE_SIZE,(safePage+1)*PAGE_SIZE);
@@ -132,19 +143,27 @@ export default function Home(){
   <a className="button secondary" href="https://vrcavatarsearch.nekosunevr.co.uk/" target="_blank" rel="noreferrer">OPEN NEKOSUNEVR ↗</a></div>
   <p className="muted">AviSeek catalog data provided by <a target="_blank" rel="noreferrer" href="https://aviseek.vrchatlegends.com/">AviSeek / VRChat Legends</a>. Only reported build platforms are imported; missing platforms are not guessed.</p>
  </div>
- <div className="card"><div className="row"><select value={mode} onChange={e=>setMode(e.target.value)}><option value="latest">Latest</option><option value="random">Random</option><option value="search">Search</option></select><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Avatar name, author, or avtr_ ID"/><select aria-label="Show avatars for platform" value={platformFilter} onChange={e=>{setPlatformFilter(e.target.value);setPageIndex(0)}}><option value="All">All platforms</option><option value="PC">PC</option><option value="Android">Quest / Android</option><option value="iOS">iOS</option></select><select aria-label="Maximum search results" value={resultLimit} onChange={e=>setResultLimit(Number(e.target.value))}><option value={120}>Up to 120</option><option value={500}>Up to 500</option><option value={1000}>Up to 1000</option></select><button disabled={checkingPlatforms} onClick={search}>RUN SEARCH</button><button disabled={checkingPlatforms||!selectedUnknown.length||!safeVerifyConfig?.enabled||!me?.isOwner} title={safeVerifyConfig?.reason||"Owner-only, conservatively paced AviSeek checks"} onClick={verifySelected}>SAFE CHECK PLATFORMS ({Math.min(selectedUnknown.length,safeVerifyConfig?.maxSelection||50)})</button>{checkingPlatforms&&<button className="secondary" type="button" disabled={stopPlatformChecks.current} onClick={()=>{stopPlatformChecks.current=true;setStatus("Stopping after the current batch finishes…")}}>STOP CHECKING</button>}<button disabled={checkingPlatforms} onClick={add}>ADD SELECTED TO GITHUB</button></div><p className="muted" aria-live="polite">{status}</p>{checkProgress&&<div className="platformCheckProgress" role="status"><progress aria-label="Platform verification progress" value={checkProgress.processed} max={Math.max(1,checkProgress.total)}/><span>{checkProgress.processed} of {checkProgress.total} selected processed • {checkProgress.resolved} resolved • {checkProgress.deferred} deferred • {checkProgress.batchCount-checkProgress.batchesFinished} batches remaining</span></div>}<p className="muted" style={{fontSize:12}}>Bulk checks are owner-only and off by default until a shared Redis limit is configured. When enabled, at most 50 per click, 10 per AviSeek request, 30 seconds between requests for the entire site; results are cached. {safeVerifyConfig?.reason||"Bulk safety controls active."} Search and auto-import have their own provider traffic and should be managed separately.</p><p className="muted" style={{fontSize:12}}>Platform filter affects provider searches. Click RUN SEARCH again after changing it to load matching avatars from AviSeek.</p></div>
+ <div className="card searchCard"><div className="searchCardHeading"><div><h2>🔎 Smart Avatar Search</h2><p className="muted">Search avatar sources once, combine matching platform evidence, and optionally double-check unknown IDs at a safe pace.</p></div><span className="searchSafety">API-friendly search</span></div>
+ <div className="searchControls"><select value={mode} aria-label="Search mode" disabled={searching||checkingPlatforms} onChange={e=>setMode(e.target.value)}><option value="latest">Latest</option><option value="random">Random</option><option value="search">Search</option></select><input value={q} disabled={searching||checkingPlatforms} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")search()}} placeholder="Search avatar name, creator or avtr_ ID"/><select aria-label="Show avatars for platform" value={platformFilter} disabled={searching||checkingPlatforms} onChange={e=>{setPlatformFilter(e.target.value);setPageIndex(0)}}><option value="All">All platforms</option><option value="PC">PC</option><option value="Android">Quest / Android</option><option value="iOS">iOS</option></select><select aria-label="Maximum search results" value={resultLimit} disabled={searching||checkingPlatforms} onChange={e=>setResultLimit(Number(e.target.value))}><option value={120}>Up to 120</option><option value={500}>Up to 500</option><option value={1000}>Up to 1000</option></select><button type="button" className="runSearchBtn" disabled={searching||checkingPlatforms} onClick={search}>{searching?"SEARCHING & CHECKING…":"⌕ SEARCH AVATARS"}</button></div>
+ <div className="searchOptions"><label className="searchToggle"><input type="checkbox" checked={verifiedOnly} onChange={e=>{setVerifiedOnly(e.target.checked);setPageIndex(0)}}/><span><strong>Show confirmed platforms only</strong><small>Hide avatars missing evidence. Uncheck to review every match.</small></span></label><label className="searchToggle"><input type="checkbox" checked={autoVerifyMissing} disabled={searching||checkingPlatforms} onChange={e=>setAutoVerifyMissing(e.target.checked)}/><span><strong>Auto-check missing platforms</strong><small>{safeChecksReady?"Uses capped AviSeek batches, shared cache and site-wide cooldown.":"Requires owner access and shared Redis safety setup. No extra lookup calls until enabled."}</small></span></label></div>
+ {results.length>0&&<div className="searchCounts" aria-live="polite"><span>Found <strong>{counts.total}</strong></span><span className="ok">✓ {counts.verified} confirmed</span><span className="muted">? {counts.unknown} without platform data</span>{verifiedOnly&&counts.unknown>0&&<button type="button" className="secondary" onClick={()=>{setVerifiedOnly(false);setPageIndex(0)}}>SHOW UNCONFIRMED ({counts.unknown})</button>}</div>}
+ <div className="row"><button type="button" className="secondary" disabled={checkingPlatforms||searching||!selectedUnknown.length} onClick={verifySelected}>CHECK SELECTED PLATFORMS ({Math.min(selectedUnknown.length,safeVerifyConfig?.maxSelection||50)})</button>{checkingPlatforms&&<button type="button" className="secondary" disabled={stopPlatformChecks.current} onClick={()=>{stopPlatformChecks.current=true;setStatus("Stopping safely after the current batch / wait…")}}>STOP CHECKING</button>}<button disabled={searching||checkingPlatforms} onClick={add}>ADD SELECTED TO GITHUB</button></div>
+ {!safeChecksReady&&<p className="muted" style={{fontSize:12}}>ℹ️ Extra platform lookups are not enabled: {safeChecksReason} Searches still use the platform metadata already returned by enabled sources. <a href="#platform-setup" onClick={e=>{e.preventDefault();setStatus(`To enable safe checks, configure Upstash Redis in Vercel and set SAFE_PLATFORM_VERIFY_ENABLED=true. See SMART_SEARCH_SETUP.md in the ZIP. ${safeChecksReason}`)}}>How to enable safe checks</a></p>}
+ <p className="searchStatus" aria-live="polite">{status}</p>{checkProgress&&<div className="platformCheckProgress" role="status"><progress aria-label="Platform verification progress" value={checkProgress.processed} max={Math.max(1,checkProgress.total)}/><span>{checkProgress.processed} of {checkProgress.total} checked • {checkProgress.resolved} confirmed • {checkProgress.unresolved} unconfirmed</span></div>}
+ <p className="muted" style={{fontSize:12}}>Search uses a short cooldown and caches repeated results. Unconfirmed avatars cannot be truthfully labelled PC, Android or iOS without evidence; showing confirmed only is a display filter, not a data deletion. On Vercel, shared Redis provides cross-instance request protection.</p>
+ </div>
  <div className="row resultTools"><select aria-label="Filter fetched cards by source" value={sourceFilter} onChange={e=>{setSourceFilter(e.target.value);setPageIndex(0)}}><option value="All">All sources</option>{selectedProviders.map(name=><option key={name} value={name}>{name} only</option>)}</select><span className="muted">Showing {visibleResults.length?`${safePage*PAGE_SIZE+1}–${Math.min((safePage+1)*PAGE_SIZE,visibleResults.length)}`:"0"} of {visibleResults.length} loaded avatars{searchSummary?.truncated?` (${searchSummary.totalUnique} matching IDs in fetched batches; increase the search limit for more)`:""} • {Object.values(selected).filter(Boolean).length} selected</span>
- <button type="button" className="secondary" disabled={checkingPlatforms||!pageResults.length} onClick={()=>setSelected(s=>({...s,...Object.fromEntries(pageResults.map(a=>[a.id,true]))}))}>SELECT THIS PAGE</button>
- <button type="button" className="secondary" disabled={checkingPlatforms||!allUnknown.length} onClick={()=>setSelected(s=>({...s,...Object.fromEntries(allUnknown.map(a=>[a.id,true]))}))}>SELECT ALL UNKNOWN ({allUnknown.length})</button>
- <button type="button" className="secondary" disabled={checkingPlatforms} onClick={()=>setSelected({})}>CLEAR SELECTION</button></div>
+ <button type="button" className="secondary" disabled={checkingPlatforms||searching||!pageResults.length} onClick={()=>setSelected(s=>({...s,...Object.fromEntries(pageResults.map(a=>[a.id,true]))}))}>SELECT THIS PAGE</button>
+ <button type="button" className="secondary" disabled={checkingPlatforms||searching||!allUnknown.length} onClick={()=>setSelected(s=>({...s,...Object.fromEntries(allUnknown.map(a=>[a.id,true]))}))}>SELECT ALL UNKNOWN ({allUnknown.length})</button>
+ <button type="button" className="secondary" disabled={checkingPlatforms||searching} onClick={()=>setSelected({})}>CLEAR SELECTION</button></div>
  <div className="grid">{pageResults.map(a=><article className="avatar" key={a.id}>
-  <label className="avatarCheck" title={`Select ${a.name}`}><input type="checkbox" aria-label={`Select ${a.name}`} disabled={checkingPlatforms} checked={!!selected[a.id]} onChange={e=>setSelected({...selected,[a.id]:e.target.checked})}/></label>
+  <label className="avatarCheck" title={`Select ${a.name}`}><input type="checkbox" aria-label={`Select ${a.name}`} disabled={checkingPlatforms||searching} checked={!!selected[a.id]} onChange={e=>setSelected({...selected,[a.id]:e.target.checked})}/></label>
   <div className="avatarTop">{a.thumbnailImageUrl||a.imageUrl?<img src={a.thumbnailImageUrl||a.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer"/>:<div className="avatarPlaceholder">?</div>}
    <div className="avatarIdentity"><strong>{a.name}</strong><span className="muted">{a.author}</span></div>
   </div>
   <small className="avatarId" title={a.id}>{a.id}</small>
   <div className="avatarSource">Found in: {(a.sourceProviders?.length?a.sourceProviders:[a.metadataProvider||"Unknown"]).join(" · ")}</div>
-  <div className="avatarPlatforms">{platformLabels(a).length?platformLabels(a).map(p=><span className="pill" key={p}>{p}</span>):<span className="unknownPlatform">Platforms unknown — verified before adding</span>}</div>
+  <div className="avatarPlatforms">{platformLabels(a).length?platformLabels(a).map(p=><span className="pill" key={p}>{p}</span>):<span className="unknownPlatform">Platform not confirmed · check before importing</span>}</div>
  </article>)}</div>
  {pageCount>1&&<nav className="pageNav" aria-label="Avatar search pages"><button type="button" disabled={pageIndex===0} onClick={()=>setPageIndex(p=>Math.max(0,p-1))}>← Previous</button><span>Page {safePage+1} of {pageCount}</span><button type="button" disabled={pageIndex>=pageCount-1} onClick={()=>setPageIndex(p=>Math.min(pageCount-1,p+1))}>Next →</button></nav>}
  </main>
