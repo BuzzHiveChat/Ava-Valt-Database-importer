@@ -9,7 +9,7 @@ This update is based on the supplied website screenshots and status line.
 - The platform badges PC / Android / iOS were touching because the CSS styles lived in `app/globals.css` but `app/layout.js` imports only `app/style.css`. Badges and avatars are now styled in the actually loaded stylesheet, with a safe layout for long names and avatar IDs.
 - AviSeek now uses the documented catalog `/api/world/list` for **Latest**, `/api/world/random` for **Random**, `/api/world/search` for typed queries, and `/api/world/avatars?ids=` for exact avatar ID searches. If more than 500 are requested, search/list uses the documented `nextOffset` cursor to obtain a second page.
 - Selecting **Quest / Android** or **iOS** sends a matching platform query to AviSeek. Changing the platform needs a new RUN SEARCH; the page also filters loaded cards locally.
-- Cards with unknown platform metadata are still clearly marked **Platforms unknown**. An optional **CHECK SELECTED PLATFORMS** button checks up to 10 selected unknown-platform avatars via the existing exact-ID verification workflow. It does not write to GitHub. Only confirmed platforms are set.
+- Cards with unknown platform metadata are still clearly marked **Platforms unknown**. The **CHECK SELECTED PLATFORMS** button now checks every selected unknown-platform avatar in sequential batches of up to ten. Progress and Stop controls are included. It does not write to GitHub. Only confirmed platforms are set.
 - Provider outages and invalid API JSON are surfaced as warnings rather than silently deleting results from healthy providers. HTML returned by an API is now identified separately from malformed JSON.
 
 ## How to deploy

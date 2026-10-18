@@ -25,3 +25,7 @@
 .pageNav{display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap;padding:22px 0}
 .pageNav span{font-size:14px;color:#cfc1df}
 @media(max-width:540px){main{padding:14px}.avatarTop img,.avatarPlaceholder{width:70px;height:70px;flex-basis:70px}}
+
+/* Manual verification can cover every selected avatar; requests remain safely batched. */
+.platformCheckProgress{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;color:#d8c7f0;font-size:13px}
+.platformCheckProgress progress{appearance:auto;flex:1 1 220px;max-width:450px;height:14px;accent-color:#9f70eb}

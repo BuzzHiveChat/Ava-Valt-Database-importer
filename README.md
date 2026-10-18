@@ -1,3 +1,5 @@
+> **October 2026 API safety update:** The manual bulk platform checker is now **OFF by default**, owner-only, and requires shared Redis throttling before activation. See [SAFE_API_TRAFFIC_SETUP.md](SAFE_API_TRAFFIC_SETUP.md). The public provider SEARCH and AUTO IMPORT routes have separate traffic considerations.
+
 > **18 October 2026:** Fixes for 120-result cap, provider mixing, PAW/AviSeek platform previews, and cramped avatar cards. See [AVATAR_RESULTS_FIX_OCT_2026.md](AVATAR_RESULTS_FIX_OCT_2026.md).
 
 # Ava-Valt Web Admin V2
@@ -90,3 +92,7 @@ in the same browser session. The owner-only endpoint checks creator opt-outs,
 validates each avatar against the active review queue and updates the live
 GitHub database in groups of up to 50. Successful records are removed from
 review; rejected ones remain. See `DEPLOY_THIS_UPDATE.md`.
+
+## Checking many avatar platforms
+
+In the manual search, use **SELECT ALL UNKNOWN** to select all loaded avatars with unknown platform labels, then **CHECK SELECTED PLATFORMS**. The check processes your entire selection in sequential 10-avatar requests, showing progress and offering a Stop button. See `BULK_PLATFORM_CHECK_FIX_OCT_2026.md` for details.
