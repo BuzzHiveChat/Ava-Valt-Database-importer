@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {runSelectedPlatformChecks} from "../lib/manualPlatformChecks.mjs";
-import {reportedPlatforms,platformReviewCounts,pendingPlatformChecks,applyPlatformCheckResults,filterAvatarCards} from "../lib/searchPlatformReview.mjs";
+import {reportedPlatforms,platformReviewCounts,pendingPlatformChecks,knownPlatformAvatars,applyPlatformCheckResults,filterAvatarCards} from "../lib/searchPlatformReview.mjs";
 export default function Home(){
   const [autoState,setAutoState]=useState(null); const [me,setMe]=useState(null);
   async function loadAutoState(){
@@ -34,6 +34,7 @@ export default function Home(){
  function platformLabels(a){return reportedPlatforms(a)}
  const selectedUnknown=pendingPlatformChecks(results.filter(a=>selected[a.id]),results.length||1);
  const allUnknown=pendingPlatformChecks(results,results.length||1);
+ const allKnown=knownPlatformAvatars(results);
  const counts=platformReviewCounts(results);
  const safeChecksReady=Boolean(safeVerifyConfig?.enabled&&me?.isOwner);
  const safeChecksReason=!me?.isOwner?"Only the owner may run extra lookups.":safeVerifyConfig?.reason||"Enable SAFE_PLATFORM_VERIFY_ENABLED and shared Redis on Vercel to turn on cautious platform lookups.";
@@ -154,6 +155,7 @@ export default function Home(){
  </div>
  <div className="row resultTools"><select aria-label="Filter fetched cards by source" value={sourceFilter} onChange={e=>{setSourceFilter(e.target.value);setPageIndex(0)}}><option value="All">All sources</option>{selectedProviders.map(name=><option key={name} value={name}>{name} only</option>)}</select><span className="muted">Showing {visibleResults.length?`${safePage*PAGE_SIZE+1}–${Math.min((safePage+1)*PAGE_SIZE,visibleResults.length)}`:"0"} of {visibleResults.length} loaded avatars{searchSummary?.truncated?` (${searchSummary.totalUnique} matching IDs in fetched batches; increase the search limit for more)`:""} • {Object.values(selected).filter(Boolean).length} selected</span>
  <button type="button" className="secondary" disabled={checkingPlatforms||searching||!pageResults.length} onClick={()=>setSelected(s=>({...s,...Object.fromEntries(pageResults.map(a=>[a.id,true]))}))}>SELECT THIS PAGE</button>
+ <button type="button" className="secondary" disabled={checkingPlatforms||searching||!allKnown.length} onClick={()=>setSelected(s=>({...s,...Object.fromEntries(allKnown.map(a=>[a.id,true]))}))}>SELECT ALL KNOWN ({allKnown.length})</button>
  <button type="button" className="secondary" disabled={checkingPlatforms||searching||!allUnknown.length} onClick={()=>setSelected(s=>({...s,...Object.fromEntries(allUnknown.map(a=>[a.id,true]))}))}>SELECT ALL UNKNOWN ({allUnknown.length})</button>
  <button type="button" className="secondary" disabled={checkingPlatforms||searching} onClick={()=>setSelected({})}>CLEAR SELECTION</button></div>
  <div className="grid">{pageResults.map(a=><article className="avatar" key={a.id}>

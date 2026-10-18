@@ -96,3 +96,7 @@ review; rejected ones remain. See `DEPLOY_THIS_UPDATE.md`.
 ## Checking many avatar platforms
 
 In the manual search, use **SELECT ALL UNKNOWN** to select all loaded avatars with unknown platform labels, then **CHECK SELECTED PLATFORMS**. The check processes your entire selection in sequential 10-avatar requests, showing progress and offering a Stop button. See `BULK_PLATFORM_CHECK_FIX_OCT_2026.md` for details.
+
+## Select all confirmed (known) avatars
+
+The manual Smart Avatar Search results toolbar now has **SELECT ALL KNOWN (N)** between **SELECT THIS PAGE** and **SELECT ALL UNKNOWN**. It selects every *loaded* avatar with an explicitly reported PC, Android/Quest or iOS platform across search-result pages, not just the current page. It never infers a platform or calls external APIs. The button adds these avatars to your current selection; to select **only** known avatars, click **CLEAR SELECTION** first. The search-result limit still determines how many avatars have been loaded.
