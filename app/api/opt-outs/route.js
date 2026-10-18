@@ -1,5 +1,5 @@
 import {ownerAuthorized} from "../../../lib/guard";
-import {readOptOuts,approveExclusion,dismissRequest,revokeExclusion,applyOptOutCleanup,stageMarkerRequests,filterExcluded} from "../../../lib/optOut";
+import {readOptOuts,approveExclusion,dismissRequest,revokeExclusion,applyOptOutCleanup,stageMarkerRequests,filterExcluded,promotePendingAvatarMarkers} from "../../../lib/optOut";
 import {readDb} from "../../../lib/db";
 export const dynamic="force-dynamic";
 export const maxDuration=60;
@@ -11,7 +11,8 @@ export async function POST(req){if(!await ownerAuthorized())return Response.json
  else if(b.action==="dismiss")result=await dismissRequest(b);
  else if(b.action==="revoke")result=await revokeExclusion(b);
  else if(b.action==="cleanup")result=await applyOptOutCleanup();
- else if(b.action==="scan"){const db=await readDb();const eligible=filterExcluded(db.avatars,await readOptOuts());const r=await stageMarkerRequests(eligible);result={held:r.held,queued:r.queued,available:r.allow.length};}
+ else if(b.action==="promote-pending")result=await promotePendingAvatarMarkers();
+ else if(b.action==="scan"){const db=await readDb();const eligible=filterExcluded(db.avatars,await readOptOuts());const r=await stageMarkerRequests(eligible);result={held:r.held,queued:r.queued,autoExcluded:r.autoExcluded||0,cleanup:r.cleanup,cleanupError:r.cleanupError,available:r.allow.length};}
  else return Response.json({error:"Unknown action"},{status:400});
  return Response.json(result,{headers:noCache});
  }catch(e){return Response.json({error:e.message},{status:500,headers:noCache})}}

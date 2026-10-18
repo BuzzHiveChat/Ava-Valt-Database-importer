@@ -59,7 +59,8 @@ test('batch verifies ticked avatars in one live DB write, repairs existing UNKNO
  assert.equal(queued(newId),false);assert.equal(queued(existingId),false);
  assert.equal(queued(excludedId),true);assert.equal(queued(markedId),true);assert.equal(queued(invalidId),true);
  assert.equal(store['platform-needs-review.json'].autoReview.lastRunAt,'2026-10-08T00:00:00Z');
- assert.equal(store['avatar-opt-outs.json'].pending.length,1);
+ assert.equal(store['avatar-opt-outs.json'].pending.length,0);
+ assert.equal(store['avatar-opt-outs.json'].excludedAvatars.some(x=>x.id===markedId),true);
  assert.equal(writes.filter(x=>x==='avatar-index.json').length,1);
  assert.equal(writes.filter(x=>x==='platform-needs-review.json').length,1);
 });
