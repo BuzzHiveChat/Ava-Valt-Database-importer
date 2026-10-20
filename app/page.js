@@ -27,6 +27,10 @@ export default function Home(){
  const [checkingPlatforms,setCheckingPlatforms]=useState(false),[checkProgress,setCheckProgress]=useState(null);
  const [searching,setSearching]=useState(false),[verifiedOnly,setVerifiedOnly]=useState(true),[autoVerifyMissing,setAutoVerifyMissing]=useState(true);
  const [safeVerifyConfig,setSafeVerifyConfig]=useState(null);
+ const [unknownCreatorPreview,setUnknownCreatorPreview]=useState(null);
+ const [unknownCreatorBusy,setUnknownCreatorBusy]=useState(false);
+ const [unknownCreatorConfirm,setUnknownCreatorConfirm]=useState("");
+ const [unknownCreatorMessage,setUnknownCreatorMessage]=useState("");
  useEffect(()=>{fetch("/api/import/verify",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(setSafeVerifyConfig).catch(()=>{})},[]);
  const stopPlatformChecks=useRef(false),platformChecksRunning=useRef(false),searchRunning=useRef(false);
  const load=async()=>{const r=await fetch("/api/db"); if(r.status===401){location="/login";return} const j=await r.json();setStats(j)};
@@ -112,6 +116,41 @@ export default function Home(){
     finally{loadAutoState()}
   }
   async function remove(){const id=prompt("Avatar ID to remove (avtr_...)");if(!id)return;const r=await fetch("/api/db/remove",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});const j=await r.json();setStatus(r.ok?`Removed ${id}. Database now ${j.total}.`:j.error);if(r.ok)load()}
+  async function scanUnknownCreators(){
+    if(unknownCreatorBusy)return;
+    setUnknownCreatorBusy(true);setUnknownCreatorPreview(null);setUnknownCreatorConfirm("");
+    setUnknownCreatorMessage("Checking the live GitHub database…");
+    try{
+      const r=await fetch("/api/db/unknown-creators",{cache:"no-store"});
+      const j=await r.json();
+      if(!r.ok)throw new Error(j.error||`Scan failed (HTTP ${r.status})`);
+      setUnknownCreatorPreview(j);
+      setUnknownCreatorMessage(j.found
+        ?`Found ${j.found} of ${j.scanned} avatars credited to Unknown. Review the examples below before deleting.`
+        :`Checked ${j.scanned} avatars. No unknown creator names found!`);
+    }catch(e){setUnknownCreatorMessage(`Scan failed: ${e.message}`);}
+    finally{setUnknownCreatorBusy(false);}
+  }
+  async function deleteUnknownCreators(){
+    if(unknownCreatorBusy||!unknownCreatorPreview?.found||unknownCreatorConfirm!=="DELETE UNKNOWN")return;
+    if(!window.confirm(`Delete ${unknownCreatorPreview.found} avatars credited to Unknown from the LIVE GitHub database? This does not delete avatars with unknown PC, Android or iOS platforms. You can restore a previous version through GitHub history.`))return;
+    setUnknownCreatorBusy(true);setUnknownCreatorMessage("Removing matching avatars from GitHub…");
+    try{
+      const r=await fetch("/api/db/unknown-creators",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({sha:unknownCreatorPreview.sha,confirm:"DELETE UNKNOWN"})
+      });
+      const j=await r.json();
+      if(!r.ok){
+        if(r.status===409){setUnknownCreatorPreview(null);setUnknownCreatorConfirm("");}
+        throw new Error(j.error||`Deletion failed (HTTP ${r.status})`);
+      }
+      setUnknownCreatorPreview(null);setUnknownCreatorConfirm("");
+      setUnknownCreatorMessage(`Removed ${j.removed} avatars credited to Unknown. ${j.total} avatars remain in the live database. GitHub keeps this change in commit history.`);
+      await load();
+    }catch(e){setUnknownCreatorMessage(`Nothing else was deleted: ${e.message}`);}
+    finally{setUnknownCreatorBusy(false);}
+  }
  const PAGE_SIZE=36;
  const visibleResults=filterAvatarCards(results,{platform:platformFilter,source:sourceFilter,verifiedOnly});
  const pageCount=Math.max(1,Math.ceil(visibleResults.length/PAGE_SIZE));
@@ -123,6 +162,24 @@ export default function Home(){
  ? (me?.isOwner?<button className="danger" onClick={requestAutoStop} disabled={autoState?.stopRequested}>{autoState?.stopRequested?"STOP REQUESTED — FINISHING":"STOP AFTER THIS RUN"}</button>:null)
  : <button onClick={autoImport}>RUN AUTO IMPORT NOW</button>}
  <a className="button secondary" href="/auto-import">{me?.isOwner?"AUTO IMPORT SETTINGS":"IMPORT STATUS"}</a>{me?.isOwner&&<a className="button secondary" href="/quarantine">PLATFORM QUARANTINE</a>}{me?.isOwner&&<a className="button secondary" href="/platform-review">PLATFORM NEEDS REVIEW</a>}{me?.isOwner&&<a className="button secondary" href="/opt-outs">AVATAR OPT-OUTS</a>}{me?.isOwner&&<button className="danger" onClick={remove}>Remove by ID</button>}</div></div>
+ {me?.isOwner&&<section className="card" aria-label="Unknown creator cleanup">
+  <h2>🧹 Clean Up “by Unknown” Creators</h2>
+  <p className="muted">Scan the <strong>live GitHub avatar database</strong> for avatars credited to <strong>Unknown</strong>. This checks creator names only — it will not delete avatars because their PC, Android or iOS platform is unknown.</p>
+  <div className="row"><button type="button" className="secondary" disabled={unknownCreatorBusy} onClick={scanUnknownCreators}>{unknownCreatorBusy?"PLEASE WAIT…":"SCAN LIVE DATABASE"}</button></div>
+  <p role="status" aria-live="polite" className="muted">{unknownCreatorMessage||"Nothing will be deleted until you scan, review and confirm."}</p>
+  {unknownCreatorPreview?.found>0&&<div style={{background:"#23172f",padding:14,border:"1px solid #674075",borderRadius:12}}>
+    <p><strong>{unknownCreatorPreview.found} avatars</strong> match “by Unknown” out of {unknownCreatorPreview.scanned} live avatars.</p>
+    <p className="muted" style={{fontSize:13}}>Examples to be removed (showing up to 15):</p>
+    <ul style={{maxHeight:220,overflowY:"auto",paddingLeft:20,fontSize:13,lineHeight:1.7}}>
+      {unknownCreatorPreview.sample.map((a,i)=><li key={`${a.id}-${i}`}><strong>{a.name}</strong> — by {a.author} <code>{a.id}</code></li>)}
+    </ul>
+    <p className="muted" style={{fontSize:13}}>This permanently removes the matched records from the current database. GitHub commit history can be used to restore them if necessary. New future imports are not blocked by this cleanup.</p>
+    <label style={{display:"block",fontSize:13,marginBottom:8}} htmlFor="unknown-cleanup-confirm">To confirm, type <strong>DELETE UNKNOWN</strong>:</label>
+    <div className="row"><input id="unknown-cleanup-confirm" style={{maxWidth:260}} value={unknownCreatorConfirm} disabled={unknownCreatorBusy} onChange={e=>setUnknownCreatorConfirm(e.target.value)} autoComplete="off" placeholder="DELETE UNKNOWN"/>
+      <button type="button" className="danger" disabled={unknownCreatorBusy||unknownCreatorConfirm!=="DELETE UNKNOWN"} onClick={deleteUnknownCreators}>DELETE {unknownCreatorPreview.found} UNKNOWN CREATOR AVATARS</button>
+    </div>
+  </div>}
+ </section>}
  <div className="card">
   <h2>IMPORT providers</h2>
   <p className="muted">Choose which avatar databases to search. AviSeek includes explicit PC, Quest/Android and iOS metadata. Disabled providers can be enabled in <a href="/auto-import">Auto Import Settings</a>. Selection here affects this manual search only.</p>
