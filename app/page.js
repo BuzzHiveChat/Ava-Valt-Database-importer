@@ -33,7 +33,17 @@ export default function Home(){
  const [unknownCreatorMessage,setUnknownCreatorMessage]=useState("");
  useEffect(()=>{fetch("/api/import/verify",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(setSafeVerifyConfig).catch(()=>{})},[]);
  const stopPlatformChecks=useRef(false),platformChecksRunning=useRef(false),searchRunning=useRef(false);
- const load=async()=>{const r=await fetch("/api/db"); if(r.status===401){location="/login";return} const j=await r.json();setStats(j)};
+ const [dbError,setDbError]=useState("");
+ const load=async()=>{
+  try{
+   const r=await fetch("/api/db",{cache:"no-store"});
+   if(r.status===401){location="/login";return}
+   if(!r.ok)throw new Error(`Database request failed (HTTP ${r.status}). Check the GitHub token and database settings in Vercel.`);
+   const j=await r.json();
+   if(!Number.isFinite(j?.count))throw new Error("The database returned an invalid avatar count.");
+   setStats(j);setDbError("");
+  }catch(e){setStats(null);setDbError(e.message||"Could not load the avatar database.")}
+ };
  useEffect(()=>{load()},[]);
  function platformLabels(a){return reportedPlatforms(a)}
  const selectedUnknown=pendingPlatformChecks(results.filter(a=>selected[a.id]),results.length||1);
@@ -158,7 +168,7 @@ export default function Home(){
  const pageResults=visibleResults.slice(safePage*PAGE_SIZE,(safePage+1)*PAGE_SIZE);
  return <main><h1>Ava-Valt Admin</h1><p><a href="/creator-opt-out">Creator privacy / opt-out information</a></p><div className="muted">Manage the live avatar database without opening Unity. {me&&<>Signed in as <b>{me.isOwner?"OWNER":"HIGH STAFF"}</b>.</>}</div>
  <div className="card"><h2>✨ Quick Import — Discord submissions</h2><p>Paste avatar IDs, fetch their names, manually choose platforms, then save reviewed avatars to GitHub.</p><a className="button secondary" href="/quick-import">OPEN QUICK IMPORT →</a></div>
- <div className="card"><div className={"status "+(autoState?.enabled?"good":"")}><b>{autoState?.stopRequested?"STOP REQUESTED":autoState?.running?`AUTO IMPORT RUNNING — ${autoState?.currentStage||"WORKING"}`:autoState?.enabled?"AUTO IMPORT ON — WAITING FOR NEXT RUN":"AUTO IMPORT OFF"}</b></div><div className="row"><b>{stats?stats.count.toLocaleString():"…"} avatars online</b><span className="muted">Updated: {stats?.updated||"…"}</span><button onClick={load}>Refresh</button>{autoState?.running
+ <div className="card"><div className={"status "+(autoState?.enabled?"good":"")}><b>{autoState?.stopRequested?"STOP REQUESTED":autoState?.running?`AUTO IMPORT RUNNING — ${autoState?.currentStage||"WORKING"}`:autoState?.enabled?"AUTO IMPORT ON — WAITING FOR NEXT RUN":"AUTO IMPORT OFF"}</b></div><div className="row"><b>{Number.isFinite(stats?.count)?stats.count.toLocaleString():"Unavailable"} avatars online</b><span className="muted">Updated: {stats?.updated||"…"}</span><button onClick={load}>Refresh</button>{dbError&&<span role="alert" className="err">{dbError}</span>}{autoState?.running
  ? (me?.isOwner?<button className="danger" onClick={requestAutoStop} disabled={autoState?.stopRequested}>{autoState?.stopRequested?"STOP REQUESTED — FINISHING":"STOP AFTER THIS RUN"}</button>:null)
  : <button onClick={autoImport}>RUN AUTO IMPORT NOW</button>}
  <a className="button secondary" href="/auto-import">{me?.isOwner?"AUTO IMPORT SETTINGS":"IMPORT STATUS"}</a>{me?.isOwner&&<a className="button secondary" href="/quarantine">PLATFORM QUARANTINE</a>}{me?.isOwner&&<a className="button secondary" href="/platform-review">PLATFORM NEEDS REVIEW</a>}{me?.isOwner&&<a className="button secondary" href="/opt-outs">AVATAR OPT-OUTS</a>}{me?.isOwner&&<button className="danger" onClick={remove}>Remove by ID</button>}</div></div>
