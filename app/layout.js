@@ -1,1 +1,1 @@
-import "./style.css"; export const metadata={title:"Ava-Valt Admin"}; export default function Layout({children}){return <html><body>{children}</body></html>}
+import "./style.css";import "./vault.css";import VaultNav from "./VaultNav";export const metadata={title:"Ava-Vault"};export default function Layout({children}){return <html lang="en"><body><VaultNav/>{children}</body></html>}
